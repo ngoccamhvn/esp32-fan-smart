@@ -4,34 +4,16 @@
 esphome:
   name: quatthongminh
   friendly_name: quatthongminh
-  # 1. Khai báo định danh dự án và phiên bản chạy trên chip (Bắt đầu từ 1.0.0)
-  project:
-    name: "ngoccamhvn.quatthongminh"
-    version: "1.0.0"
 
 esp32:
   variant: esp32
-  board: upesy_wroom # Khai báo bo mạch chính xác của anh để GitHub tự chọn cấu hình biên dịch
 
 api:
   encryption:
     key: "9z61dUq7DVQB9fRsvqdPfAAokP6T1faELaNAXk6GVuw="
 
-# 2. Cấu hình các giao thức nạp OTA
 ota:
-  - platform: esphome       # Giữ lại để nạp nội bộ khi cần
-  - platform: http_request  # Cho phép tự nạp từ đường dẫn URL ẩn trên GitHub
-
-# 3. Kích hoạt giao tiếp HTTP trên chip
-http_request:
-  user_agent: esphome
-  timeout: 10s
-
-# 4. Tạo giao diện Web điều khiển và khóa nút "Chọn file nạp thủ công" để bảo mật
-web_server:
-  port: 80
-  version: 2
-  ota: false # ⚠️ KHÓA tính năng up file .bin thủ công để người dùng không lấy được file
+  - platform: esphome
 
 wifi:
   ssid: !secret wifi_ssid
@@ -45,16 +27,6 @@ captive_portal:
 # VÔ HIỆU HÓA LOG SERIAL ĐỂ TRÁNH XUNG ĐỘT PHẦN CỨNG
 logger:
   baud_rate: 0
-
-# 5. Bộ tự động quét và hiện thông báo cập nhật từ GitHub
-update:
-  - platform: http_request
-    name: "Kiểm tra Firmware mới"
-    id: firmware_update
-    # Đường dẫn trỏ thẳng tới file manifest.json anh vừa tạo trên kho của anh
-    source: "https://githubusercontent.com"
-    update_interval: 24h # Cứ 24 tiếng tự động check một lần
-
 
 # ==============================================================================
 # BỘ NHỚ LƯU TRỮ MÃ SÓNG HỒNG NGOẠI (LƯU TRỮ VĨNH VIỄN)
