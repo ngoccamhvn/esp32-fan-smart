@@ -492,6 +492,7 @@ button:
                       ESP_LOGE("GitHub_OTA", "Không thể tìm thấy thông tin tag_name từ GitHub API.");
                     }
 
+# THAY THẾ CHÍNH XÁC KHỐI NÚT UPDATE_FIRMWARE_BTN TỪ DÒNG KHOẢNG 495
   - platform: template
     name: "Click to Update Firmware"
     id: update_firmware_btn
@@ -508,5 +509,19 @@ button:
             condition:
               lambda: 'return id(has_new_fw);'
             then:
-              - ota.http_request.flash:
+              # Dùng http_request thông thường để lấy file nhị phân mà không bị ép kiểm tra MD5
+              - http_request.get:
                   url: "https://github.com{github_user}/${github_repo}/releases/latest/download/firmware.bin"
+                  on_response:
+                    then:
+                      - lambda: |-
+                          // Đọc luồng dữ liệu byte thô từ kết quả phản hồi của HTTP Request
+                          auto raw_body = x;
+                          if (!raw_body.empty()) {
+                            ESP_LOGI("GitHub_OTA", "Tải file thành công (%d bytes). Tiến hành flash...", raw_body.size());
+                            
+                            // Gọi luồng nạp OTA gốc của hệ thống ESPHome để ghi đè dữ liệu vào chip
+                            esphome::ota::api_ota_write((const uint8_t*)raw_body.data(), raw_body.size());
+                          } else {
+                            ESP_LOGE("GitHub_OTA", "Lỗi: File firmware tải về trống rỗng.");
+                          }
