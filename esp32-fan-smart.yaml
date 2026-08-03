@@ -21,6 +21,15 @@ api:
 
 ota:
   - platform: esphome
+  - platform: web_server
+
+web_server:
+  port: 80
+  version: 3
+
+  auth:
+    username: admin
+    password: 12345678
 
 wifi:
   ssid: !secret wifi_ssid
