@@ -2,7 +2,9 @@
 # Definition: definitions/boards/upesy_wroom/manifest.yaml
 
 substitutions:
-  fw_version: "1.0.0"
+  fw_version: "1.0.0" # Khi có bản mới, anh chỉ cần tăng số này lên (VD: "1.0.1") rồi push lên GitHub
+  github_user: "ngoccamhvn" # Sửa lại đúng Tên tài khoản GitHub của anh
+  github_repo: "esp32_fan_smart" # Sửa lại đúng Tên kho lưu trữ (Repository) trên GitHub của anh
 
 esphome:
   name: quatthongminh
@@ -26,7 +28,6 @@ ota:
 web_server:
   port: 80
   version: 3
-
   auth:
     username: "admin"
     password: "12345678"
@@ -43,6 +44,70 @@ captive_portal:
 # VÔ HIỆU HÓA LOG SERIAL ĐỂ TRÁNH XUNG ĐỘT PHẦN CỨNG
 logger:
   baud_rate: 0
+
+# --- BẮT ĐẦU PHẦN CẤU HÌNH CẬP NHẬT TỰ ĐỘNG TỪ GITHUB ---
+
+# Yêu cầu bắt buộc để ESP32 có thể gửi request lên GitHub API
+http_request:
+  user_agent: esphome-device
+  timeout: 10s
+
+# Cảm biến hiển thị phiên bản mới nhất tìm thấy trên GitHub lên giao diện Web
+text_sensor:
+  - platform: template
+    name: "Latest Version Available"
+    id: latest_version
+    icon: "mdi:github"
+
+# Nút bấm kiểm tra và thực hiện cập nhật trên giao diện IP của ESP32
+button:
+  - platform: template
+    name: "Check Firmware Update"
+    id: check_update_btn
+    icon: "mdi:cloud-check"
+    on_press:
+      then:
+        - logger.log: "Đang kiểm tra phiên bản mới từ GitHub..."
+        - http_request.get:
+            url: !sidebar "https://github.com{github_user}/${github_repo}/releases/latest"
+            headers:
+              Accept: "application/vnd.github.v3+json"
+            on_response:
+              then:
+                - lambda: |-
+                    auto json = json::parse(body);
+                    if (json.contains("tag_name")) {
+                      std::string new_ver = json["tag_name"].get<std::string>();
+                      
+                      // Loại bỏ ký tự 'v' ở đầu nếu GitHub Release tag dạng v1.0.1
+                      if (new_ver.rfind("v", 0) == 0) {
+                        new_ver = new_ver.substr(1);
+                      }
+                      
+                      id(latest_version).publish_state(new_ver);
+                      
+                      // So sánh phiên bản GitHub với biến fw_version hiện tại của thiết bị
+                      if (new_ver != "${fw_version}") {
+                        id(update_firmware_btn).set_disabled(false);
+                        ESP_LOGI("GitHub_OTA", "Phát hiện bản cập nhật mới: %s", new_ver.c_str());
+                      } else {
+                        ESP_LOGI("GitHub_OTA", "Firmware hiện tại (%s) đã là mới nhất.", new_ver.c_str());
+                      }
+                    } else {
+                      ESP_LOGE("GitHub_OTA", "Không tìm thấy thông tin tag_name từ GitHub API.");
+                    }
+
+  - platform: template
+    name: "Click to Update Firmware"
+    id: update_firmware_btn
+    icon: "mdi:cloud-download"
+    disabled: true # Mặc định ẩn, chỉ sáng lên khi nút Check phát hiện có bản mới
+    on_press:
+      then:
+        - logger.log: "Bắt đầu tải firmware và cập nhật OTA từ GitHub..."
+        - lambda: |-
+            std::string url = "https://github.com{github_user}/${github_repo}/releases/latest/download/firmware.bin";
+            esphome::ota::custom_backend_ota(url);
 
 # ==============================================================================
 # BỘ NHỚ LƯU TRỮ MÃ SÓNG HỒNG NGOẠI (LƯU TRỮ VĨNH VIỄN)
