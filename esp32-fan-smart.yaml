@@ -2,7 +2,7 @@
 # Definition: definitions/boards/upesy_wroom/manifest.yaml
 
 substitutions:
-  fw_version: "1.0.5" 
+  fw_version: "1.0.6" 
   github_user: "ngoccamhvn" 
   github_repo: "esp32_fan_smart" # Kiểm tra chính xác tên Repo trên GitHub của anh
 
