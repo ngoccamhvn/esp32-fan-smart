@@ -1,0 +1,48 @@
+name: Compile and Release ESPHome
+
+on:
+  push:
+    branches:
+      - main 
+    paths:
+      - 'esp32-fan-smart.yaml' # Chỉ chạy khi file này thay đổi
+
+permissions:
+  contents: write 
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up and Compile ESPHome
+        id: esphome-build
+        uses: esphome/build-action@v7
+        with:
+          yaml-file: esp32-fan-smart.yaml # Đổi tên file yaml cần build
+          version: latest
+
+      - name: Prepare firmware file
+        run: |
+          mkdir -p output_fw
+          cp -r output/* output_fw/ || true
+          find output -name "*ota.bin" -exec cp {} ./firmware.bin \;
+          
+          # Nếu build action bản cũ không sinh ota.bin ngoài output, lấy trực tiếp từ thư mục build của esp32-fan-smart
+          if [ ! -f ./firmware.bin ]; then
+            mv .esphome/build/esp32-fan-smart/.pioenvs/esp32-fan-smart/firmware.bin ./firmware.bin
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }} 
+          name: Release v${{ github.run_number }}
+          body: |
+            Tự động biên dịch Firmware cho esp32-fan-smart.
+            Mã commit: ${{ github.sha }}
+          files: firmware.bin
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
