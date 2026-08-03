@@ -1,64 +1,302 @@
-# 🍃 Dự án Quạt Thông Minh ESP32 (Smart Fan Control)
+# ESP32 Smart Fan Controller
 
-Dự án phần cứng và mã nguồn mở biến quạt cơ thông thường thành quạt thông minh tích hợp vào hệ thống nhà thông minh **Home Assistant**. Hệ thống sử dụng bo mạch **uPesy ESP32 Wroom DevKit**, được lập trình bằng nền tảng **ESPHome** và tích hợp quy trình **Tự động hóa CI/CD cập nhật OTA qua GitHub Actions**.
-
----
-
-## 🌟 Tính năng nổi bật
-
-* **Điều khiển đa chế độ**: Quản lý bật/tắt, điều chỉnh 3 cấp độ gió tuần tự và đảo gió (Swing).
-* **Mã hóa hồng ngoại vạn năng**: Sử dụng thuật toán băm toàn chuỗi xung thông minh (**MurmurHash3**) kết hợp mắt thu phát hồng ngoại để học và lưu trữ mã remote vĩnh viễn vào bộ nhớ Flash của ESP32.
-* **Tự động hóa CI/CD**: Mỗi khi chỉnh sửa và `git push` file cấu hình lên GitHub, hệ thống sẽ tự động biên dịch tạo ra bản phát hành (Release) mới.
-* **Cập nhật OTA chỉ với 1 chạm**: Truy cập giao diện IP cục bộ của ESP32 để kiểm tra phiên bản mới nhất trên GitHub và kích hoạt nạp Firmware từ xa qua mạng (Over-The-Air) an toàn bằng nhân ESP-IDF gốc.
+> Bộ điều khiển quạt thông minh sử dụng **ESP32 + ESPHome + Home Assistant** với khả năng **học lệnh hồng ngoại**, **điều khiển từ xa**, **OTA qua GitHub** và **giữ nguyên cách sử dụng quạt gốc**.
 
 ---
 
-## 📂 Cấu trúc thư mục kho lưu trữ
+# Giới thiệu
 
-```text
-├── .github/workflows/
-│   └── deploy.yml          # Kịch bản tự động biên dịch và tạo Release trên GitHub
-├── esp32-fan-smart.yaml    # File cấu hình cấu trúc phần cứng và logic ESPHome
-├── github_ota.h            # Thư viện C++ Custom Component nạp OTA trực tiếp bằng ESP-IDF
-├── secrets.yaml            # Nơi lưu trữ thông tin WiFi bảo mật (Không công khai công cộng)
-└── README.md               # Hướng dẫn sử dụng dự án này
+Đây là firmware dành cho ESP32 giúp biến quạt điện thông thường thành quạt thông minh mà **không cần thay đổi kết cấu của quạt**.
+
+Thiết bị hỗ trợ điều khiển trực tiếp bằng nút bấm, remote hồng ngoại hoặc Home Assistant, đồng thời vẫn đảm bảo người dùng có thể sử dụng quạt như ban đầu.
+
+---
+
+# Tính năng nổi bật
+
+✅ Điều khiển quạt qua Home Assistant
+
+✅ Điều khiển trực tiếp bằng nút bấm vật lý
+
+✅ Học lệnh từ mọi loại remote hồng ngoại
+
+✅ Hỗ trợ 3 cấp tốc độ
+
+✅ Điều khiển đảo gió
+
+✅ Chế độ quạt cơ và quạt điện tử
+
+✅ Đồng bộ trạng thái giữa thiết bị và Home Assistant
+
+✅ Web Server tích hợp
+
+✅ OTA qua trình duyệt Web
+
+✅ OTA tự động từ GitHub Releases
+
+✅ Lưu dữ liệu vào Flash, không mất khi mất điện
+
+---
+
+# Hai chế độ hoạt động
+
+Firmware hỗ trợ hai chế độ điều khiển độc lập.
+
+## 1. Chế độ Quạt Cơ
+
+Ở chế độ này:
+
+- Các nút bấm trên quạt hoạt động như nguyên bản.
+- Home Assistant chỉ hiển thị trạng thái.
+- Không làm thay đổi cách sử dụng ban đầu.
+
+---
+
+## 2. Chế độ Quạt Điện Tử
+
+ESP32 sẽ điều khiển toàn bộ hoạt động của quạt.
+
+Có thể thực hiện:
+
+- Bật / Tắt
+- Tốc độ 1
+- Tốc độ 2
+- Tốc độ 3
+- Đảo gió
+- Chuyển tốc độ tuần tự
+- Điều khiển từ Home Assistant
+- Điều khiển bằng Remote
+
+---
+
+# Học lệnh hồng ngoại
+
+Một trong những tính năng nổi bật nhất của dự án là khả năng **tự học lệnh hồng ngoại**.
+
+Firmware không phụ thuộc vào giao thức NEC, Sony, Samsung...
+
+Thay vào đó sử dụng thuật toán băm (Hash) để ghi nhớ toàn bộ chuỗi xung của remote.
+
+Điều này giúp thiết bị tương thích với gần như mọi loại điều khiển từ xa.
+
+Các phím được học gồm:
+
+- Bật / Tắt
+- Chuyển tốc độ
+- Tốc độ 1
+- Tốc độ 2
+- Tốc độ 3
+- Đảo gió
+
+Toàn bộ dữ liệu được lưu trong bộ nhớ Flash nên không bị mất khi mất nguồn.
+
+---
+
+# Thuật toán nhận dạng Remote
+
+Firmware sử dụng thuật toán **Murmur Hash** để mã hóa chuỗi xung hồng ngoại.
+
+Ưu điểm:
+
+- Không cần thư viện IR riêng
+- Không phụ thuộc giao thức
+- Hỗ trợ hầu hết các loại remote
+- Tốc độ xử lý nhanh
+- Tiết kiệm bộ nhớ RAM
+- Hoạt động ổn định ngay cả khi tín hiệu hồng ngoại bị sai lệch nhỏ
+
+---
+
+# Điều khiển Relay an toàn
+
+Ba relay tốc độ được cấu hình **Interlock**.
+
+Điều này đảm bảo:
+
+- Không thể bật đồng thời nhiều cấp tốc độ.
+- Tránh chập relay.
+- Bảo vệ động cơ quạt.
+
+Relay đảo gió sẽ tự động tắt khi quạt ngừng hoạt động.
+
+---
+
+# Đồng bộ với Home Assistant
+
+Firmware tự động tạo các thực thể (Entity) trong Home Assistant.
+
+Bao gồm:
+
+### Button
+
+- Học lệnh IR
+- Bật/Tắt
+- Chuyển tốc độ
+- Kiểm tra Firmware mới
+- Cập nhật Firmware
+
+### Switch
+
+- Tốc độ 1
+- Tốc độ 2
+- Tốc độ 3
+- Đảo gió
+
+### Binary Sensor
+
+- Trạng thái nút bấm
+- Trạng thái Relay
+- Chế độ hoạt động
+
+### Text Sensor
+
+- Trạng thái học lệnh
+- Phiên bản Firmware mới nhất
+
+---
+
+# Cập nhật Firmware OTA qua GitHub
+
+Firmware hỗ trợ cập nhật trực tiếp từ GitHub Releases.
+
+Quy trình hoạt động:
+
+ESP32
+
+↓
+
+Kiểm tra phiên bản mới trên GitHub
+
+↓
+
+So sánh phiên bản hiện tại
+
+↓
+
+Thông báo có Firmware mới
+
+↓
+
+Tải file firmware.bin
+
+↓
+
+Nạp Firmware
+
+↓
+
+Khởi động lại thiết bị
+
+Toàn bộ quá trình không cần sử dụng ESPHome Dashboard.
+
+---
+
+# Web Server tích hợp
+
+Thiết bị có Web Server sẵn.
+
+Có thể truy cập bằng địa chỉ IP của ESP32 để:
+
+- Xem thông tin thiết bị
+- Kiểm tra trạng thái
+- OTA bằng trình duyệt
+- Cập nhật Firmware
+
+Mặc định:
+
+Port:
+
+80
+
+Tên đăng nhập:
+
+admin
+
+Mật khẩu:
+
+12345678
+
+---
+
+# Phần cứng sử dụng
+
+## Vi điều khiển
+
+ESP32
+
+## Sơ đồ chân
+
+| GPIO | Chức năng |
+|------|-----------|
+| GPIO12 | Thu tín hiệu hồng ngoại |
+| GPIO13 | Công tắc chọn chế độ |
+| GPIO14 | Nút điều khiển số 1 |
+| GPIO25 | Nút đảo gió |
+| GPIO26 | Nút tốc độ 3 |
+| GPIO27 | Nút điều khiển số 2 |
+| GPIO33 | Nút học lệnh |
+| GPIO16 | Relay tốc độ 1 |
+| GPIO17 | Relay tốc độ 2 |
+| GPIO5 | Relay tốc độ 3 |
+| GPIO18 | Relay đảo gió |
+
+---
+
+# Công nghệ sử dụng
+
+- ESPHome
+- Home Assistant API
+- GitHub OTA
+- HTTP Request
+- Web Server
+- Murmur Hash
+- Flash Storage
+- Relay Interlock
+- OTA qua Web
+- OTA qua GitHub
+
+---
+
+# Cấu trúc dự án
+
+```
+ESP32_FAN_SMART
+
+├── firmware.yaml
+├── github_ota.h
+├── README.md
+├── build/
+└── releases/
+    └── firmware.bin
 ```
 
 ---
 
-## 🛠️ Sơ đồ chân kết nối phần cứng (Pinout)
+# Hướng phát triển
 
-| Linh kiện / Chức năng | Chân GPIO trên ESP32 | Chế độ cấu hình | Ghi chú |
-| :--- | :---: | :---: | :--- |
-| **Mắt thu hồng ngoại (IR)** | `GPIO12` | INPUT_PULLUP | Strapping PIN (Sử dụng cẩn thận) |
-| **Nút bấm học lệnh vật lý** | `GPIO33` | INPUT_PULLUP | Nhấn giữ để học lệnh / Nhấn nhả để chuyển số |
-| **Công tắc gạt chế độ** | `GPIO13` | INPUT_PULLUP | Phân quyền và khóa logic điều khiển |
-| **Rơ-le số 1 / 2 / 3 & Đảo gió**| Các chân Relay | OUTPUT | Phụ thuộc vào đấu nối mạch rơ-le thực tế |
+Trong các phiên bản tiếp theo sẽ bổ sung:
 
----
-
-## 🚀 Hướng dẫn vận hành quy trình cập nhật OTA
-
-### 1. Quản lý phiên bản khi sửa code
-Mỗi khi anh thực hiện thay đổi tính năng quạt trong file `esp32-fan-smart.yaml`, hãy tìm đến dòng cấu hình biến môi trường ở đầu file và tăng số phiên bản lên:
-```yaml
-substitutions:
-  fw_version: "1.0.1" # Tăng số này lên bản mới (Ví dụ: 1.0.0 -> 1.0.1)
-```
-
-### 2. Kích hoạt quy trình biên dịch tự động
-Tiến hành `git commit` và `git push` mã nguồn lên GitHub. Hệ thống **GitHub Actions** sẽ tự chạy trong khoảng 2 phút để biên dịch mã nguồn C++, trích xuất số phiên bản để tạo ra bản phát hành định dạng **Release v1.0.1** kèm file đóng gói `firmware.bin`.
-
-### 3. Cập nhật trên thiết bị bằng 1 chạm
-1. Mở trình duyệt, gõ **địa chỉ IP cục bộ của ESP32** Quạt Thông Minh.
-2. Đăng nhập với tài khoản quản trị (Mặc định: `admin` / `12345678`).
-3. Nhấn nút **Check Firmware Update**: ESP32 sẽ âm thầm gọi GitHub API để kiểm tra. Nếu phát hiện có bản mới, đèn nhật ký hệ thống sẽ báo: *"Phát hiện bản cập nhật mới: X.X.X"*.
-4. Nhấn nút **Click to Update Firmware**: Mạch sẽ tự động tải file nhị phân từ internet về, thực hiện flashing an toàn vào bộ nhớ và tự reboot lại để chạy tính năng mới trong 15 giây.
+- Hẹn giờ tắt quạt
+- Điều khiển bằng MQTT
+- Tự động theo nhiệt độ phòng
+- Điều khiển bằng giọng nói
+- Giao diện Web cấu hình WiFi
+- Điều chỉnh thời gian đảo gió
+- Điều khiển nhiều quạt cùng lúc
+- Theo dõi điện năng tiêu thụ
 
 ---
 
-## 🔒 Bảo mật dữ liệu cá nhân
-Thông tin định danh mạng WiFi nội bộ được mã hóa tách biệt hoàn toàn qua file `secrets.yaml`. Vui lòng không chia sẻ file này để đảm bảo an toàn an ninh mạng cho gia đình anh.
+# Giấy phép
+
+Dự án được phát hành theo giấy phép **MIT License**.
 
 ---
-✍️ *Dự án được phát triển và duy trì bởi độc quyền bởi **@ngoccamhvn** (Trương Ngọc Cam).*
+
+# Tác giả
+
+**Ngọc Cam**
+
+Nếu dự án hữu ích, hãy nhấn ⭐ Star để ủng hộ và theo dõi các bản cập nhật mới.
+
+Mọi đóng góp, báo lỗi hoặc đề xuất tính năng đều được chào đón thông qua mục **Issues** hoặc **Pull Requests** trên GitHub.
