@@ -455,7 +455,7 @@ button:
               else if (id(relay_toc_do_3).state) id(relay_toc_do_1).turn_on();
             }
           }
-# THAY THẾ TOÀN BỘ KHỐI BUTTON TỪ DÒNG KHOẢNG 450 ĐẾN HẾT NÚT UPDATE
+# THAY THẾ CHÍNH XÁC KHỐI NÚT TỪ DÒNG KHOẢNG 450 ĐẾN HẾT NÚT CLICK TO UPDATE
   - platform: template
     name: "Check Firmware Update"
     id: check_update_btn
@@ -470,8 +470,8 @@ button:
             on_response:
               then:
                 - lambda: |-
-                    // Đọc nội dung chuỗi JSON từ biến hệ thống 'response' (thay vì 'x')
-                    std::string body = response.get_string();
+                    // Sử dụng hàm as_string() chuẩn mực để đọc dữ liệu từ con trỏ thông minh response
+                    std::string body = response->as_string();
                     
                     size_t pos = body.find("\"tag_name\":\"");
                     if (pos != std::string::npos) {
@@ -487,7 +487,7 @@ button:
                       
                       if (new_ver != "${fw_version}") {
                         id(has_new_fw) = true;
-                        ESP_LOGI("GitHub_OTA", "Phát hiện bản cập nhật mới: %s. Sẵn sàng cập nhật.", new_ver.c_str());
+                        ESP_LOGI("GitHub_OTA", "Phát hiện bản cập nhật mới: %s. Bạn đã có thể nhấn nút Cập nhật.", new_ver.c_str());
                       } else {
                         id(has_new_fw) = false;
                         ESP_LOGI("GitHub_OTA", "Firmware hiện tại (%s) đã là mới nhất.", new_ver.c_str());
@@ -504,36 +504,9 @@ button:
       then:
         - lambda: |-
             if (id(has_new_fw)) {
-              ESP_LOGI("GitHub_OTA", "Khởi chạy quy trình tải firmware tự động...");
+              std::string url = "https://github.com{github_user}/${github_repo}/releases/latest/download/firmware.bin";
+              // Gọi hàm nạp native an toàn từ file github_ota.h
+              GitHubOTA::start_update(url);
             } else {
-              ESP_LOGW("GitHub_OTA", "Không có bản cập nhật mới nào.");
+              ESP_LOGW("GitHub_OTA", "Không có bản cập nhật mới nào để thực hiện.");
             }
-        - if:
-            condition:
-              lambda: 'return id(has_new_fw);'
-            then:
-              - http_request.get:
-                  url: "https://github.com{github_user}/${github_repo}/releases/latest/download/firmware.bin"
-                  on_response:
-                    then:
-                      - lambda: |-
-                          // Đọc dữ liệu nhị phân từ biến response hệ thống
-                          std::string bin_body = response.get_string();
-                          if (!bin_body.empty()) {
-                            ESP_LOGI("GitHub_OTA", "Tải file thành công (%d bytes). Tiến hành flash...", bin_body.size());
-                            
-                            // Gọi cấu trúc phân vùng OTA nội bộ để tự ghi trực tiếp vào Flash
-                            auto *ota_backend = esphome::ota::get_global_ota_backend();
-                            if (ota_backend != nullptr) {
-                              ota_backend->begin(bin_body.size());
-                              ota_backend->write((const uint8_t*)bin_body.data(), bin_body.size());
-                              ota_backend->end();
-                              ESP_LOGI("GitHub_OTA", "Nạp thành công! Thiết bị đang khởi động lại...");
-                              delay(500);
-                              App.safe_reboot();
-                            } else {
-                              ESP_LOGE("GitHub_OTA", "Không thể khởi tạo bộ nhớ phân vùng OTA.");
-                            }
-                          } else {
-                            ESP_LOGE("GitHub_OTA", "Lỗi: File firmware tải về trống rỗng.");
-                          }
