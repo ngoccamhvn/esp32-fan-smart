@@ -502,26 +502,22 @@ button:
         - lambda: |-
             if (id(has_new_fw)) {
               ESP_LOGI("GitHub_OTA", "Kích hoạt luồng tải xuống và nạp đè Firmware OTA...");
-              id(update_firmware_btn).turn_on(); // Thực hiện kích hoạt
             } else {
               ESP_LOGW("GitHub_OTA", "Không có bản cập nhật mới nào để thực hiện.");
             }
-      # Sử dụng công cụ nạp native kết hợp http_request để kéo trực tiếp file từ github
-      - if:
-          condition:
-            lambda: 'return id(has_new_fw);'
-          then:
-            - http_request.get:
-                url: "https://github.com{github_user}/${github_repo}/releases/latest/download/firmware.bin"
-                on_response:
-                  then:
-                    - lambda: |-
-                        // Nhận luồng file nhị phân và tự động nạp thẳng vào bộ nhớ Flash qua OTA
-                        std::string bin_body = id(update_firmware_btn).get_string_response();
-                        if (!bin_body.empty()) {
-                          ESP_LOGI("GitHub_OTA", "Tải file thành công (%d bytes). Tiến hành flash...", bin_body.size());
-                          // Gọi hàm nội bộ ép ghi vào phân vùng OTA
-                          esphome::ota::api_ota_write((const uint8_t*)bin_body.data(), bin_body.size());
-                        } else {
-                          ESP_LOGE("GitHub_OTA", "Lỗi: Tải file firmware từ GitHub trống rỗng.");
-                        }
+        - if:
+            condition:
+              lambda: 'return id(has_new_fw);'
+            then:
+              - http_request.get:
+                  url: "https://github.com{github_user}/${github_repo}/releases/latest/download/firmware.bin"
+                  on_response:
+                    then:
+                      - lambda: |-
+                          std::string bin_body = id(update_firmware_btn).get_string_response();
+                          if (!bin_body.empty()) {
+                            ESP_LOGI("GitHub_OTA", "Tải file thành công (%d bytes). Tiến hành flash...", bin_body.size());
+                            esphome::ota::api_ota_write((const uint8_t*)bin_body.data(), bin_body.size());
+                          } else {
+                            ESP_LOGE("GitHub_OTA", "Lỗi: Tải file firmware từ GitHub trống rỗng.");
+                          }
