@@ -56,6 +56,7 @@ text_sensor:
     id: latest_version
     icon: "mdi:github"
 
+# SỬA LẠI ĐOẠN NÀY TRONG FILE esp32-fan-smart.yaml
 button:
   - platform: template
     name: "Check Firmware Update"
@@ -65,7 +66,7 @@ button:
       then:
         - logger.log: "Đang kiểm tra phiên bản mới từ GitHub..."
         - http_request.get:
-            url: !sidebar "https://github.com{github_user}/${github_repo}/releases/latest"
+            url: "https://github.com{github_user}/${github_repo}/releases/latest" # Bỏ chữ !sidebar ở đây đi
             headers:
               Accept: "application/vnd.github.v3+json"
             on_response:
