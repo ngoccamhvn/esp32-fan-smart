@@ -1,5 +1,3 @@
-# Board: uPesy ESP32 Wroom DevKit
-# Definition: definitions/boards/upesy_wroom/manifest.yaml
 
 substitutions:
   fw_version: "1.1.1" 
