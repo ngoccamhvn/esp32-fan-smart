@@ -2,17 +2,21 @@
 # Definition: definitions/boards/upesy_wroom/manifest.yaml
 
 substitutions:
-  fw_version: "1.0.8" 
+  fw_version: "1.0.9" 
   github_user: "ngoccamhvn" 
   github_repo: "esp32_fan_smart" # Kiểm tra chính xác tên Repo trên GitHub của anh
 
+
 esphome:
-  name: esp32-fan-smart # Đã đổi thành esp32-fan-smart
+  name: esp32-fan-smart
   friendly_name: quatthongminh
   comment: "Firmware ${fw_version}"
   project:
     name: ngoccamhvn.esp32_fan_smart
     version: ${fw_version}
+  includes:
+    - github_ota.h # <-- CHÈN THÊM DÒNG NÀY VÀO ĐÂY
+
 
 esp32:
   variant: esp32
@@ -46,11 +50,6 @@ captive_portal:
 # VÔ HIỆU HÓA LOG SERIAL ĐỂ TRÁNH XUNG ĐỘT PHẦN CỨNG
 logger:
   baud_rate: 0
-
-esphome:
-  # ... các khai báo cũ giữ nguyên ...
-  includes:
-    - github_ota.h
     
 # SỬA LẠI ĐÚNG THẲNG HÀNG SÁT LỀ TRÁI (KHOẢNG DÒNG 50)
 http_request:
