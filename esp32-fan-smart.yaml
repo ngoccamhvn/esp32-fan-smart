@@ -55,6 +55,14 @@ text_sensor:
     name: "Latest Version Available"
     id: latest_version
     icon: "mdi:github"
+    
+  # Ô hiển thị tiến trình học Lệnh lên màn hình Home Assistant
+
+  - platform: template
+    name: "Trạng thái học lệnh IR"
+    id: text_learning_status
+    lambda: |-
+      return {"Chế độ thường"};
 
 # SỬA LẠI ĐOẠN NÀY TRONG FILE esp32-fan-smart.yaml
 button:
@@ -130,13 +138,7 @@ globals:
     type: uint32_t
     initial_value: '0'
 
-# Ô hiển thị tiến trình học Lệnh lên màn hình Home Assistant
-text_sensor:
-  - platform: template
-    name: "Trạng thái học lệnh IR"
-    id: text_learning_status
-    lambda: |-
-      return {"Chế độ thường"};
+
 # ==============================================================================
 # BỘ THU HỒNG NGOẠI MÃ HÓA TOÀN CHUỖI SỬ DỤNG MURMURHASH VẠN NĂNG (GPIO12)
 # ==============================================================================
