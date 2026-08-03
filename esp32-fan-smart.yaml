@@ -7,8 +7,8 @@ substitutions:
   github_repo: "esp32_fan_smart" # Sửa lại đúng Tên kho lưu trữ (Repository) trên GitHub của anh
 
 esphome:
-  name: quatthongminh
-  friendly_name: quatthongminh
+  name: esp32-fan-smart
+  friendly_name: esp32-fan-smart
   comment: "Firmware ${fw_version}"
   project:
     name: ngoccamhvn.esp32_fan_smart
