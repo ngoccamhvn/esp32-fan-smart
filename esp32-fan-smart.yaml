@@ -450,6 +450,7 @@ button:
             }
           }
 # SỬA LẠI ĐOẠN NÀY TRONG FILE esp32-fan-smart.yaml
+# THAY THẾ TOÀN BỘ KHỐI BUTTON TỪ DÒNG KHOẢNG 451
   - platform: template
     name: "Check Firmware Update"
     id: check_update_btn
@@ -464,37 +465,63 @@ button:
             on_response:
               then:
                 - lambda: |-
-                    auto json = json::parse(body);
-                    if (json.contains("tag_name")) {
-                      std::string new_ver = json["tag_name"].get<std::string>();
+                    // Trích xuất chuỗi JSON trả về từ HTTP response an toàn
+                    std::string body = id(check_update_btn).get_string_response();
+                    
+                    // Tìm tag_name thủ công để không bị phụ thuộc/lỗi thư viện json::parse
+                    size_t pos = body.find("\"tag_name\":\"");
+                    if (pos != std::string::npos) {
+                      pos += 12; // Nhảy qua chuỗi "tag_name":"
+                      size_t end_pos = body.find("\"", pos);
+                      std::string new_ver = body.substr(pos, end_pos - pos);
+                      
+                      // Cắt bỏ chữ 'v' nếu có ở đầu tag (VD: v1.0.1 -> 1.0.1)
                       if (new_ver.rfind("v", 0) == 0) {
                         new_ver = new_ver.substr(1);
                       }
+                      
                       id(latest_version).publish_state(new_ver);
+                      
                       if (new_ver != "${fw_version}") {
-                        id(has_new_fw) = true; // Kích hoạt cho phép cập nhật
+                        id(has_new_fw) = true;
                         ESP_LOGI("GitHub_OTA", "Phát hiện bản cập nhật mới: %s. Bạn đã có thể nhấn nút Cập nhật.", new_ver.c_str());
                       } else {
                         id(has_new_fw) = false;
                         ESP_LOGI("GitHub_OTA", "Firmware hiện tại (%s) đã là mới nhất.", new_ver.c_str());
                       }
                     } else {
-                      ESP_LOGE("GitHub_OTA", "Không tìm thấy thông tin tag_name từ GitHub API.");
+                      ESP_LOGE("GitHub_OTA", "Không thể tìm thấy thông tin tag_name từ dữ liệu GitHub trả về.");
                     }
 
   - platform: template
     name: "Click to Update Firmware"
     id: update_firmware_btn
     icon: "mdi:cloud-download"
-    # Đã xóa dòng disabled: true gây lỗi cú pháp
     on_press:
       then:
         - lambda: |-
             if (id(has_new_fw)) {
-              ESP_LOGI("GitHub_OTA", "Bắt đầu tải firmware và cập nhật OTA từ GitHub...");
-              // Sửa lỗi chính tả đường dẫn URL tải file
-              std::string url = "https://github.com{github_user}/${github_repo}/releases/latest/download/firmware.bin";
-              esphome::ota::custom_backend_ota(url);
+              ESP_LOGI("GitHub_OTA", "Kích hoạt luồng tải xuống và nạp đè Firmware OTA...");
+              id(update_firmware_btn).turn_on(); // Thực hiện kích hoạt
             } else {
-              ESP_LOGW("GitHub_OTA", "Không có bản cập nhật mới nào để thực hiện. Hãy nhấn nút Check trước!");
+              ESP_LOGW("GitHub_OTA", "Không có bản cập nhật mới nào để thực hiện.");
             }
+      # Sử dụng công cụ nạp native kết hợp http_request để kéo trực tiếp file từ github
+      - if:
+          condition:
+            lambda: 'return id(has_new_fw);'
+          then:
+            - http_request.get:
+                url: "https://github.com{github_user}/${github_repo}/releases/latest/download/firmware.bin"
+                on_response:
+                  then:
+                    - lambda: |-
+                        // Nhận luồng file nhị phân và tự động nạp thẳng vào bộ nhớ Flash qua OTA
+                        std::string bin_body = id(update_firmware_btn).get_string_response();
+                        if (!bin_body.empty()) {
+                          ESP_LOGI("GitHub_OTA", "Tải file thành công (%d bytes). Tiến hành flash...", bin_body.size());
+                          // Gọi hàm nội bộ ép ghi vào phân vùng OTA
+                          esphome::ota::api_ota_write((const uint8_t*)bin_body.data(), bin_body.size());
+                        } else {
+                          ESP_LOGE("GitHub_OTA", "Lỗi: Tải file firmware từ GitHub trống rỗng.");
+                        }
