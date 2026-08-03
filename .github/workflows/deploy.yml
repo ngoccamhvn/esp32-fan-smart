@@ -17,6 +17,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # BƯỚC MỚI: Tự động trích xuất số phiên bản từ file yaml
+      - name: Get firmware version
+        id: get_ver
+        run: |
+          VERSION=$(grep 'fw_version:' esp32-fan-smart.yaml | head -n1 | awk '{print $2}' | tr -d '"' | tr -d "'")
+          echo "FW_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Dự án đang ở phiên bản: $VERSION"
+
       - name: Set up and Compile ESPHome
         id: esphome-build
         uses: esphome/build-action@v7
@@ -34,15 +42,15 @@ jobs:
             exit 1
           fi
 
-# SỬA LẠI ĐOẠN CUỐI FILE deploy.yml NHƯ SAU:
+      # BƯỚC TẠO RELEASE: Sử dụng biến môi trường đã trích xuất an toàn
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          # Thay thế cụm v${{ github.run_number }} cũ bằng biến fw_version
-          tag_name: v${{ grep 'fw_version:' esp32-fan-smart.yaml | head -n1 | awk '{print $2}' | tr -d '"' }}
-          name: Release v${{ grep 'fw_version:' esp32-fan-smart.yaml | head -n1 | awk '{print $2}' | tr -d '"' }}
+          tag_name: v${{ env.FW_VERSION }}
+          name: Release v${{ env.FW_VERSION }}
           body: |
             Tự động biên dịch Firmware cho esp32-fan-smart thành công.
+            Phiên bản cấu hình: v${{ env.FW_VERSION }}
             Mã commit: ${{ github.sha }}
           files: firmware.bin
         env:
