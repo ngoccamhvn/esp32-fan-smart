@@ -2,7 +2,7 @@
 # Definition: definitions/boards/upesy_wroom/manifest.yaml
 
 substitutions:
-  fw_version: "1.0.7" 
+  fw_version: "1.0.8" 
   github_user: "ngoccamhvn" 
   github_repo: "esp32_fan_smart" # Kiểm tra chính xác tên Repo trên GitHub của anh
 
@@ -47,6 +47,11 @@ captive_portal:
 logger:
   baud_rate: 0
 
+esphome:
+  # ... các khai báo cũ giữ nguyên ...
+  includes:
+    - github_ota.h
+    
 # SỬA LẠI ĐÚNG THẲNG HÀNG SÁT LỀ TRÁI (KHOẢNG DÒNG 50)
 http_request:
   useragent: esphome-device
