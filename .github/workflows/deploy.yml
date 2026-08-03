@@ -34,11 +34,13 @@ jobs:
             exit 1
           fi
 
+# SỬA LẠI ĐOẠN CUỐI FILE deploy.yml NHƯ SAU:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }} 
-          name: Release v${{ github.run_number }}
+          # Thay thế cụm v${{ github.run_number }} cũ bằng biến fw_version
+          tag_name: v${{ grep 'fw_version:' esp32-fan-smart.yaml | head -n1 | awk '{print $2}' | tr -d '"' }}
+          name: Release v${{ grep 'fw_version:' esp32-fan-smart.yaml | head -n1 | awk '{print $2}' | tr -d '"' }}
           body: |
             Tự động biên dịch Firmware cho esp32-fan-smart thành công.
             Mã commit: ${{ github.sha }}
