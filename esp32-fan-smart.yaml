@@ -28,8 +28,8 @@ web_server:
   version: 3
 
   auth:
-    username: admin
-    password: 12345678
+    username: "admin"
+    password: "12345678"
 
 wifi:
   ssid: !secret wifi_ssid
