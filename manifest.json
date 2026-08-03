@@ -1,0 +1,13 @@
+{
+  "name": "ESP32 Fan Smart",
+  "version": "1.0.0",
+  "builds": [
+    {
+      "chipFamily": "ESP32",
+      "ota": {
+        "path": "",
+        "md5": ""
+      }
+    }
+  ]
+}
