@@ -1,0 +1,446 @@
+# Board: uPesy ESP32 Wroom DevKit
+# Definition: definitions/boards/upesy_wroom/manifest.yaml
+
+esphome:
+  name: quatthongminh
+  friendly_name: quatthongminh
+  # 1. Khai báo định danh dự án và phiên bản chạy trên chip (Bắt đầu từ 1.0.0)
+  project:
+    name: "ngoccamhvn.quatthongminh"
+    version: "1.0.0"
+
+esp32:
+  variant: esp32
+  board: upesy_wroom # Khai báo bo mạch chính xác của anh để GitHub tự chọn cấu hình biên dịch
+
+api:
+  encryption:
+    key: "9z61dUq7DVQB9fRsvqdPfAAokP6T1faELaNAXk6GVuw="
+
+# 2. Cấu hình các giao thức nạp OTA
+ota:
+  - platform: esphome       # Giữ lại để nạp nội bộ khi cần
+  - platform: http_request  # Cho phép tự nạp từ đường dẫn URL ẩn trên GitHub
+
+# 3. Kích hoạt giao tiếp HTTP trên chip
+http_request:
+  user_agent: esphome
+  timeout: 10s
+
+# 4. Tạo giao diện Web điều khiển và khóa nút "Chọn file nạp thủ công" để bảo mật
+web_server:
+  port: 80
+  version: 2
+  ota: false # ⚠️ KHÓA tính năng up file .bin thủ công để người dùng không lấy được file
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "esp32 Fallback Hotspot"
+    password: "12345678"
+
+captive_portal:
+
+# VÔ HIỆU HÓA LOG SERIAL ĐỂ TRÁNH XUNG ĐỘT PHẦN CỨNG
+logger:
+  baud_rate: 0
+
+# 5. Bộ tự động quét và hiện thông báo cập nhật từ GitHub
+update:
+  - platform: http_request
+    name: "Kiểm tra Firmware mới"
+    id: firmware_update
+    # Đường dẫn trỏ thẳng tới file manifest.json anh vừa tạo trên kho của anh
+    source: "https://githubusercontent.com"
+    update_interval: 24h # Cứ 24 tiếng tự động check một lần
+
+
+# ==============================================================================
+# BỘ NHỚ LƯU TRỮ MÃ SÓNG HỒNG NGOẠI (LƯU TRỮ VĨNH VIỄN)
+# ==============================================================================
+globals:
+  - id: learning_mode
+    type: int
+    initial_value: '0' # 0: Thường, 1: Tắt bật, 2: Chuyển số, 3: Số 1, 4: Số 2, 5: Số 3, 6: Đảo gió
+  - id: ir_num_power
+    type: uint32_t
+    initial_value: '0'
+  - id: ir_num_cycle
+    type: uint32_t
+    initial_value: '0'
+  - id: ir_num_speed1
+    type: uint32_t
+    initial_value: '0'
+  - id: ir_num_speed2
+    type: uint32_t
+    initial_value: '0'
+  - id: ir_num_speed3
+    type: uint32_t
+    initial_value: '0'
+  - id: ir_num_swing
+    type: uint32_t
+    initial_value: '0'
+
+# Ô hiển thị tiến trình học Lệnh lên màn hình Home Assistant
+text_sensor:
+  - platform: template
+    name: "Trạng thái học lệnh IR"
+    id: text_learning_status
+    lambda: |-
+      return {"Chế độ thường"};
+# ==============================================================================
+# BỘ THU HỒNG NGOẠI MÃ HÓA TOÀN CHUỖI SỬ DỤNG MURMURHASH VẠN NĂNG (GPIO12)
+# ==============================================================================
+remote_receiver:
+  pin: 
+    number: GPIO12
+    mode: INPUT_PULLUP
+  dump: raw
+  filter: 40us
+  idle: 30ms
+  on_raw:
+    - lambda: |-
+        if (x.empty() || x.size() < 8) return;
+
+        // Thuật toán băm mã hóa toàn chuỗi xung thông minh (MurmurHash3)
+        uint32_t hash = 0x811C9DC5; 
+        for (auto item : x) {
+          int normalized_pulse = (std::abs(item) / 150) * 150;
+          if (item < 0) normalized_pulse = -normalized_pulse; 
+          hash ^= (uint32_t)normalized_pulse;
+          hash *= 0x01000193; 
+        }
+
+        // 1. NẾU ĐANG Ở CHẾ ĐỘ HỌC LỆNH -> Lưu mã vào bộ nhớ Flash
+        if (id(learning_mode) > 0) {
+          if (id(learning_mode) == 1) { id(ir_num_power) = hash; id(text_learning_status).publish_state("Đã học xong: TẮT BẬT"); }
+          else if (id(learning_mode) == 2) { id(ir_num_cycle) = hash; id(text_learning_status).publish_state("Đã học xong: CHUYỂN TỐC ĐỘ"); }
+          else if (id(learning_mode) == 3) { id(ir_num_speed1) = hash; id(text_learning_status).publish_state("Đã học xong: TỐC ĐỘ 1"); }
+          else if (id(learning_mode) == 4) { id(ir_num_speed2) = hash; id(text_learning_status).publish_state("Đã học xong: TỐC ĐỘ 2"); }
+          else if (id(learning_mode) == 5) { id(ir_num_speed3) = hash; id(text_learning_status).publish_state("Đã học xong: TỐC ĐỘ 3"); }
+          else if (id(learning_mode) == 6) { id(ir_num_swing) = hash; id(text_learning_status).publish_state("Đã học xong: ĐẢO GIÓ"); }
+          return;
+        }
+
+        // Kiểm tra thời gian thực trạng thái quạt có đang bật chạy số nào hay không
+        bool is_fan_active = id(relay_toc_do_1).state || id(relay_toc_do_2).state || id(relay_toc_do_3).state;
+
+        // 2. NẾU Ở CHẾ ĐỘ CHẠY THƯỜNG -> Thực thi điều khiển khiển Remote từ xa khi gạt ON
+        if (hash == id(ir_num_power)) {
+          if (id(condition_mode_switch).state) id(virtual_power_button).press();
+        }
+        else if (hash == id(ir_num_cycle)) {
+          if (id(condition_mode_switch).state && is_fan_active) id(virtual_cycle_button).press();
+        }
+        else if (hash == id(ir_num_speed1)) {
+          if (id(condition_mode_switch).state && is_fan_active) id(relay_toc_do_1).turn_on();
+        }
+        else if (hash == id(ir_num_speed2)) {
+          if (id(condition_mode_switch).state && is_fan_active) id(relay_toc_do_2).turn_on();
+        }
+        else if (hash == id(ir_num_speed3)) {
+          if (id(condition_mode_switch).state && is_fan_active) id(relay_toc_do_3).turn_on();
+        }
+        else if (hash == id(ir_num_swing)) {
+          // VÁ LỖI LOGIC: Ép Công tắc chế độ phải đang ON và quạt đang chạy thì phím đảo gió hồng ngoại mới có tác dụng
+          if (id(condition_mode_switch).state && is_fan_active) {
+            id(virtual_swing_switch).toggle();
+          }
+        }
+
+# ==============================================================================
+# CẤU HÌNH CỤM NÚT BẤM VẬT LÝ ESP32 (ĐỒNG BỘ ĐẤU CHUNG CHÂN MASS 0V/GND)
+# ==============================================================================
+binary_sensor:
+  - platform: status
+    id: esphome_device_status
+
+  # GPIO33: Nút bấm vật lý học lệnh hồng ngoại
+  - platform: gpio
+    id: button_learning_33
+    pin: { number: GPIO33, mode: INPUT_PULLUP, inverted: true }
+    name: "Nút bấm - Học Lệnh Hồng Ngoại"
+    on_click:
+      - min_length: 3000ms
+        max_length: 10000ms
+        then:
+          - button.press: virtual_trigger_learn_start
+      - max_length: 2000ms
+        then:
+          - button.press: virtual_trigger_learn_next
+
+  # GPIO13: Công tắc gạt chuyển đổi chế độ phân quyền điều khiển
+  - platform: gpio
+    id: condition_mode_switch
+    pin: { number: GPIO13, mode: INPUT_PULLUP, inverted: true }
+    name: "Trạng thái Công tắc Chế độ"
+    on_press:
+      - lambda: |-
+          id(relay_toc_do_1).turn_off(); delay(10); id(relay_toc_do_2).turn_off(); delay(10);
+          id(relay_toc_do_3).turn_off(); delay(10); id(relay_dao_huong).turn_off();
+
+  # GPIO14: ĐA NHIỆM 1
+  - platform: gpio
+    id: button_multi_14
+    pin: { number: GPIO14, mode: INPUT_PULLUP, inverted: true }
+    name: "Nút bấm quạt - Số 1 (ON/OFF)"
+    filters: [ delayed_on: 50ms ]
+    on_press:
+      - lambda: |-
+          if (!id(condition_mode_switch).state) id(relay_toc_do_1).turn_on();
+          else id(virtual_power_button).press();
+    on_release:
+      - lambda: |-
+          if (!id(condition_mode_switch).state) id(relay_toc_do_1).turn_off();
+
+  # GPIO27: ĐA NHIỆM 2
+  - platform: gpio
+    id: button_multi_27
+    pin: { number: GPIO27, mode: INPUT_PULLUP, inverted: true }
+    name: "Nút bấm quạt - Số 2 (Nút chuyển tốc độ)"
+    filters: [ delayed_on: 50ms ]
+    on_press:
+      - lambda: |-
+          if (!id(condition_mode_switch).state) id(relay_toc_do_2).turn_on();
+          else id(virtual_cycle_button).press();
+    on_release:
+      - lambda: |-
+          if (!id(condition_mode_switch).state) id(relay_toc_do_2).turn_off();
+
+  # GPIO26: Công tắc tốc độ số 3 (Chỉ hoạt động khi Chế độ OFF)
+  - platform: gpio
+    id: button_so_26
+    pin: { number: GPIO26, mode: INPUT_PULLUP, inverted: true }
+    name: "Nút bấm quạt - Số 3"
+    on_press:
+      - lambda: |-
+          if (!id(condition_mode_switch).state) id(relay_toc_do_3).turn_on();
+    on_release:
+      - lambda: |-
+          if (!id(condition_mode_switch).state) id(relay_toc_do_3).turn_off();
+
+  # GPIO25: Nút bấm cơ điều khiển đảo hướng gió
+  - platform: gpio
+    id: physical_swing_button
+    pin: { number: GPIO25, mode: INPUT_PULLUP, inverted: true }
+    name: "Nút Bấm Đảo Hướng Gió"
+    filters: [ delayed_on: 50ms ]
+    on_press:
+      - lambda: |-
+          bool is_fan_running = id(relay_toc_do_1).state || id(relay_toc_do_2).state || id(relay_toc_do_3).state;
+          if (is_fan_running) {
+            if (!id(condition_mode_switch).state) id(relay_dao_huong).turn_on();
+            else id(virtual_swing_switch).toggle();
+          }
+    on_release:
+      - lambda: |-
+          if (!id(condition_mode_switch).state) id(relay_dao_huong).turn_off();
+
+  # --- 4 CẢM BIẾN GIÁM SÁT TRẠNG THÁI ĐẦU RA RELAY TRÊN GIAO DIỆN HASS ---
+  - platform: template
+    name: "Trạng thái Relay - Số 1"
+    icon: "mdi:power-plug-outline"
+    lambda: |-
+      return id(relay_toc_do_1).state;
+  - platform: template
+    name: "Trạng thái Relay - Số 2"
+    icon: "mdi:power-plug-outline"
+    lambda: |-
+      return id(relay_toc_do_2).state;
+  - platform: template
+    name: "Trạng thái Relay - Số 3"
+    icon: "mdi:power-plug-outline"
+    lambda: |-
+      return id(relay_toc_do_3).state;
+  - platform: template
+    name: "Trạng thái Relay - Đảo Hướng"
+    icon: "mdi:power-plug-outline"
+    lambda: |-
+      return id(relay_dao_huong).state;
+# ==============================================================================
+# CẤU HÌNH CÁC RƠ-LE VẬT LÝ KÍCH MỨC THẤP (ACTIVE LOW) ĐÃ ĐỒNG BỘ 100%
+# ==============================================================================
+switch:
+  # GPIO16: Rơ-le tốc độ số 1
+  - platform: gpio
+    id: relay_toc_do_1
+    pin: { number: GPIO16, inverted: true }
+    restore_mode: ALWAYS_OFF
+    interlock: [relay_toc_do_2, relay_toc_do_3]
+    on_turn_off:
+      - delay: 50ms
+      - lambda: |-
+          bool any_running = id(relay_toc_do_1).state || id(relay_toc_do_2).state || id(relay_toc_do_3).state;
+          if (!any_running) id(relay_dao_huong).turn_off();
+
+  # GPIO17: Rơ-le tốc độ số 2
+  - platform: gpio
+    id: relay_toc_do_2
+    pin: { number: GPIO17, inverted: true }
+    restore_mode: ALWAYS_OFF
+    interlock: [relay_toc_do_1, relay_toc_do_3]
+    on_turn_off:
+      - delay: 50ms
+      - lambda: |-
+          bool any_running = id(relay_toc_do_1).state || id(relay_toc_do_2).state || id(relay_toc_do_3).state;
+          if (!any_running) id(relay_dao_huong).turn_off();
+
+  # GPIO5: Rơ-le tốc độ số 3
+  - platform: gpio
+    id: relay_toc_do_3
+    pin: { number: GPIO5, inverted: true }
+    restore_mode: ALWAYS_OFF
+    interlock: [relay_toc_do_1, relay_toc_do_2]
+    on_turn_off:
+      - delay: 50ms
+      - lambda: |-
+          bool any_running = id(relay_toc_do_1).state || id(relay_toc_do_2).state || id(relay_toc_do_3).state;
+          if (!any_running) id(relay_dao_huong).turn_off();
+
+  # GPIO18: Rơ-le đảo hướng gió
+  - platform: gpio
+    id: relay_dao_huong
+    pin: { number: GPIO18, inverted: true }
+    restore_mode: ALWAYS_OFF
+    on_turn_on:
+      - lambda: id(virtual_swing_switch).publish_state(true);
+    on_turn_off:
+      - lambda: id(virtual_swing_switch).publish_state(false);
+
+  # --- CÔNG TẮC ẢO ĐẢO HƯỚNG GIÓ ---
+  - platform: template
+    name: "Đảo Hướng Gió"
+    id: virtual_swing_switch
+    icon: "mdi:rotate-left-right"
+    lambda: |-
+      if (!id(esphome_device_status).state) return false;
+      return id(relay_dao_huong).state;
+    turn_on_action:
+      - lambda: |-
+          bool is_fan_running = id(relay_toc_do_1).state || id(relay_toc_do_2).state || id(relay_toc_do_3).state;
+          if (is_fan_running) id(relay_dao_huong).turn_on();
+          else id(virtual_swing_switch).publish_state(false);
+    turn_off_action:
+      - switch.turn_off: relay_dao_huong
+
+  # --- 3 CÔNG TẮC ẢO CHỈNH TỐC ĐỘ ---
+  - platform: template
+    name: "Quạt - Tốc độ 1"
+    id: hass_switch_1
+    icon: "mdi:fan-speed-1"
+    lambda: |-
+      if (!id(esphome_device_status).state) return false;
+      return id(relay_toc_do_1).state;
+    turn_on_action:
+      - lambda: |-
+          if (!id(condition_mode_switch).state) id(relay_toc_do_1).turn_on();
+          else id(hass_switch_1).publish_state(false);
+    turn_off_action:
+      - lambda: |-
+          if (!id(condition_mode_switch).state) id(relay_toc_do_1).turn_off();
+
+  - platform: template
+    name: "Quạt - Tốc độ 2"
+    id: hass_switch_2
+    icon: "mdi:fan-speed-2"
+    lambda: |-
+      if (!id(esphome_device_status).state) return false;
+      return id(relay_toc_do_2).state;
+    turn_on_action:
+      - lambda: |-
+          if (!id(condition_mode_switch).state) id(relay_toc_do_2).turn_on();
+          else id(hass_switch_2).publish_state(false);
+    turn_off_action:
+      - lambda: |-
+          if (!id(condition_mode_switch).state) id(relay_toc_do_2).turn_off();
+
+  - platform: template
+    name: "Quạt - Tốc độ 3"
+    id: hass_switch_3
+    icon: "mdi:fan-speed-3"
+    lambda: |-
+      if (!id(esphome_device_status).state) return false;
+      return id(relay_toc_do_3).state;
+    turn_on_action:
+      - lambda: |-
+          if (!id(condition_mode_switch).state) id(relay_toc_do_3).turn_on();
+          else id(hass_switch_3).publish_state(false);
+    turn_off_action:
+      - lambda: |-
+          if (!id(condition_mode_switch).state) id(relay_toc_do_3).turn_off();
+
+# ==============================================================================
+# CẤU HÌNH CÁC NÚT ĐIỀU KHIỂN CHỨC NĂNG VÀ HỆ THỐNG GỘP HỌC LỆNH
+# ==============================================================================
+button:
+  # NÚT ẢO GỘP RÚT GỌN (BUTTON CHUẨN API): Click 1 phát -> Tự động hóa điều phối logic
+  - platform: template
+    name: "Học Lệnh IR"
+    id: virtual_combined_learning_button
+    icon: "mdi:remote-layers"
+    on_press:
+      - lambda: |-
+          if (id(learning_mode) == 0) {
+            id(virtual_trigger_learn_start).press(); 
+          } else {
+            id(virtual_trigger_learn_next).press();  
+          }
+
+  # --- LUỒNG TRUNG GIAN ĐỒNG BỘ ---
+  - platform: template
+    id: virtual_trigger_learn_start
+    on_press:
+      - lambda: |-
+          if (id(learning_mode) == 0) {
+            id(learning_mode) = 1;
+            id(text_learning_status).publish_state("Đang học phím: TẮT BẬT");
+          }
+  - platform: template
+    id: virtual_trigger_learn_next
+    on_press:
+      - lambda: |-
+          if (id(learning_mode) > 0) {
+            id(learning_mode)++;
+            if (id(learning_mode) == 2) id(text_learning_status).publish_state("Đang học phím: CHUYỂN TỐC ĐỘ");
+            else if (id(learning_mode) == 3) id(text_learning_status).publish_state("Đang học phím: TỐC ĐỘ 1");
+            else if (id(learning_mode) == 4) id(text_learning_status).publish_state("Đang học phím: TỐC ĐỘ 2");
+            else if (id(learning_mode) == 5) id(text_learning_status).publish_state("Đang học phím: TỐC ĐỘ 3");
+            else if (id(learning_mode) == 6) id(text_learning_status).publish_state("Đang học phím: ĐẢO GIÓ");
+            else { 
+              id(learning_mode) = 0; 
+              id(text_learning_status).publish_state("Đã thoát và Lưu lệnh thành công!"); 
+            }
+          }
+
+  # Nút ảo nguồn quạt chung
+  - platform: template
+    name: "Nút Tắt Bật (On⁄Off)"
+    id: virtual_power_button
+    icon: "mdi:power"
+    on_press:
+      - lambda: |-
+          if (id(condition_mode_switch).state) {
+            bool is_running = id(relay_toc_do_1).state || id(relay_toc_do_2).state || id(relay_toc_do_3).state;
+            if (is_running) {
+              id(relay_toc_do_1).turn_off(); id(relay_toc_do_2).turn_off(); id(relay_toc_do_3).turn_off();
+            } else {
+              id(relay_toc_do_2).turn_on();
+            }
+          }
+
+  # Nút ảo chỉnh tốc độ vòng tròn
+  - platform: template
+    name: "Nút Chuyển Tốc Độ"
+    id: virtual_cycle_button
+    icon: "mdi:fan-chevron-up"
+    on_press:
+      - lambda: |-
+          if (id(condition_mode_switch).state) {
+            bool is_running = id(relay_toc_do_1).state || id(relay_toc_do_2).state || id(relay_toc_do_3).state;
+            if (is_running) {
+              if (id(relay_toc_do_1).state) id(relay_toc_do_2).turn_on();
+              else if (id(relay_toc_do_2).state) id(relay_toc_do_3).turn_on();
+              else if (id(relay_toc_do_3).state) id(relay_toc_do_1).turn_on();
+            }
+          }
