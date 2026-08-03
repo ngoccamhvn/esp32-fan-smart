@@ -4,6 +4,10 @@
 esphome:
   name: quatthongminh
   friendly_name: quatthongminh
+  comment: "Firmware ${fw_version}"
+  project:
+    name: ngoccamhvn.esp32_fan_smart
+    version: ${fw_version}
 
 esp32:
   variant: esp32
