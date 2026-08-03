@@ -2,7 +2,7 @@
 # Definition: definitions/boards/upesy_wroom/manifest.yaml
 
 substitutions:
-  fw_version: "1.0.9" 
+  fw_version: "1.1.0" 
   github_user: "ngoccamhvn" 
   github_repo: "esp32_fan_smart" # Kiểm tra chính xác tên Repo trên GitHub của anh
 
@@ -470,8 +470,8 @@ button:
             on_response:
               then:
                 - lambda: |-
-                    // Sử dụng hàm as_string() chuẩn mực để đọc dữ liệu từ con trỏ thông minh response
-                    std::string body = response->as_string();
+                    // ĐỌC CHUỖI AN TOÀN TUYỆT ĐỐI TỪ ĐỐI TƯỢNG VIEW CỦA HTTP CONTAINER
+                    std::string body(response->view().data(), response->view().size());
                     
                     size_t pos = body.find("\"tag_name\":\"");
                     if (pos != std::string::npos) {
@@ -505,7 +505,7 @@ button:
         - lambda: |-
             if (id(has_new_fw)) {
               std::string url = "https://github.com{github_user}/${github_repo}/releases/latest/download/firmware.bin";
-              // Gọi hàm nạp native an toàn từ file github_ota.h
+              // Gọi hàm nạp native an toàn từ file github_ota.h (Đã gộp cấu hình cấu trúc ESP-IDF v5)
               GitHubOTA::start_update(url);
             } else {
               ESP_LOGW("GitHub_OTA", "Không có bản cập nhật mới nào để thực hiện.");
