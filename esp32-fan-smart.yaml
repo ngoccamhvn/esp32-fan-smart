@@ -2,7 +2,7 @@
 # Definition: definitions/boards/upesy_wroom/manifest.yaml
 
 substitutions:
-  fw_version: "1.0.4" 
+  fw_version: "1.0.5" 
   github_user: "ngoccamhvn" 
   github_repo: "esp32_fan_smart" # Kiểm tra chính xác tên Repo trên GitHub của anh
 
@@ -24,6 +24,8 @@ api:
 ota:
   - platform: esphome
   - platform: web_server
+  - platform: http_request # THÊM DÒNG NÀY VÀO ĐÂY ĐỂ KÍCH HOẠT TÍNH NĂNG NẠP QUA URL!
+
 
 web_server:
   port: 80
@@ -49,9 +51,6 @@ logger:
 http_request:
   useragent: esphome-device
   timeout: 10s
-
-http_request_ota: # Đặt sát lề trái, thẳng hàng với http_request phía trên!
-
 
 text_sensor:
   - platform: template
