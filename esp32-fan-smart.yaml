@@ -187,7 +187,7 @@ binary_sensor:
   - platform: gpio
     id: button_multi_14
     pin: { number: GPIO14, mode: INPUT_PULLUP, inverted: true }
-    name: "Nút bấm quạt - Số 1 (ON/OFF)"
+    name: "Nút bấm quạt - Số 1 (ON-OFF)"
     filters: [ delayed_on: 50ms ]
     on_press:
       - lambda: |-
@@ -418,7 +418,7 @@ button:
 
   # Nút ảo nguồn quạt chung
   - platform: template
-    name: "Nút Tắt Bật (On⁄Off)"
+    name: "Nút Tắt Bật (On-Off)"
     id: virtual_power_button
     icon: "mdi:power"
     on_press:
@@ -448,6 +448,7 @@ button:
             }
           }
 # SỬA LẠI ĐOẠN NÀY TRONG FILE esp32-fan-smart.yaml
+# SỬA LẠI ĐOẠN KHỐI BUTTON TỪ DÒNG 451
   - platform: template
     name: "Check Firmware Update"
     id: check_update_btn
@@ -456,8 +457,8 @@ button:
       then:
         - logger.log: "Đang kiểm tra phiên bản mới từ GitHub..."
         - http_request.get:
-            url: "https://github.com{github_user}/${github_repo}/releases/latest" # Bỏ chữ !sidebar ở đây đi
-            headers:
+            url: "https://github.com{github_user}/${github_repo}/releases/latest" 
+            request_headers: # ĐÃ ĐỔI TỪ headers THÀNH request_headers
               Accept: "application/vnd.github.v3+json"
             on_response:
               then:
@@ -465,13 +466,10 @@ button:
                     auto json = json::parse(body);
                     if (json.contains("tag_name")) {
                       std::string new_ver = json["tag_name"].get<std::string>();
-                      
                       if (new_ver.rfind("v", 0) == 0) {
                         new_ver = new_ver.substr(1);
                       }
-                      
                       id(latest_version).publish_state(new_ver);
-                      
                       if (new_ver != "${fw_version}") {
                         id(update_firmware_btn).set_disabled(false);
                         ESP_LOGI("GitHub_OTA", "Phát hiện bản cập nhật mới: %s", new_ver.c_str());
