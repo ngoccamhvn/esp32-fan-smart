@@ -64,53 +64,6 @@ text_sensor:
     lambda: |-
       return {"Chế độ thường"};
 
-# SỬA LẠI ĐOẠN NÀY TRONG FILE esp32-fan-smart.yaml
-button:
-  - platform: template
-    name: "Check Firmware Update"
-    id: check_update_btn
-    icon: "mdi:cloud-check"
-    on_press:
-      then:
-        - logger.log: "Đang kiểm tra phiên bản mới từ GitHub..."
-        - http_request.get:
-            url: "https://github.com{github_user}/${github_repo}/releases/latest" # Bỏ chữ !sidebar ở đây đi
-            headers:
-              Accept: "application/vnd.github.v3+json"
-            on_response:
-              then:
-                - lambda: |-
-                    auto json = json::parse(body);
-                    if (json.contains("tag_name")) {
-                      std::string new_ver = json["tag_name"].get<std::string>();
-                      
-                      if (new_ver.rfind("v", 0) == 0) {
-                        new_ver = new_ver.substr(1);
-                      }
-                      
-                      id(latest_version).publish_state(new_ver);
-                      
-                      if (new_ver != "${fw_version}") {
-                        id(update_firmware_btn).set_disabled(false);
-                        ESP_LOGI("GitHub_OTA", "Phát hiện bản cập nhật mới: %s", new_ver.c_str());
-                      } else {
-                        ESP_LOGI("GitHub_OTA", "Firmware hiện tại (%s) đã là mới nhất.", new_ver.c_str());
-                      }
-                    } else {
-                      ESP_LOGE("GitHub_OTA", "Không tìm thấy thông tin tag_name từ GitHub API.");
-                    }
-
-  - platform: template
-    name: "Click to Update Firmware"
-    id: update_firmware_btn
-    icon: "mdi:cloud-download"
-    disabled: true 
-    on_press:
-      then:
-        - logger.log: "Bắt đầu tải firmware và cập nhật OTA từ GitHub..."
-        - lambda: |-
-            std::string url = "https://github.com{github_user}/${github_repo}/releases/latest/download/firmware.bin";
-            esphome::ota::custom_backend_ota(url);
 
 # ==============================================================================
 # BỘ NHỚ LƯU TRỮ MÃ SÓNG HỒNG NGOẠI (LƯU TRỮ VĨNH VIỄN)
@@ -494,3 +447,49 @@ button:
               else if (id(relay_toc_do_3).state) id(relay_toc_do_1).turn_on();
             }
           }
+# SỬA LẠI ĐOẠN NÀY TRONG FILE esp32-fan-smart.yaml
+  - platform: template
+    name: "Check Firmware Update"
+    id: check_update_btn
+    icon: "mdi:cloud-check"
+    on_press:
+      then:
+        - logger.log: "Đang kiểm tra phiên bản mới từ GitHub..."
+        - http_request.get:
+            url: "https://github.com{github_user}/${github_repo}/releases/latest" # Bỏ chữ !sidebar ở đây đi
+            headers:
+              Accept: "application/vnd.github.v3+json"
+            on_response:
+              then:
+                - lambda: |-
+                    auto json = json::parse(body);
+                    if (json.contains("tag_name")) {
+                      std::string new_ver = json["tag_name"].get<std::string>();
+                      
+                      if (new_ver.rfind("v", 0) == 0) {
+                        new_ver = new_ver.substr(1);
+                      }
+                      
+                      id(latest_version).publish_state(new_ver);
+                      
+                      if (new_ver != "${fw_version}") {
+                        id(update_firmware_btn).set_disabled(false);
+                        ESP_LOGI("GitHub_OTA", "Phát hiện bản cập nhật mới: %s", new_ver.c_str());
+                      } else {
+                        ESP_LOGI("GitHub_OTA", "Firmware hiện tại (%s) đã là mới nhất.", new_ver.c_str());
+                      }
+                    } else {
+                      ESP_LOGE("GitHub_OTA", "Không tìm thấy thông tin tag_name từ GitHub API.");
+                    }
+
+  - platform: template
+    name: "Click to Update Firmware"
+    id: update_firmware_btn
+    icon: "mdi:cloud-download"
+    disabled: true 
+    on_press:
+      then:
+        - logger.log: "Bắt đầu tải firmware và cập nhật OTA từ GitHub..."
+        - lambda: |-
+            std::string url = "https://github.com{github_user}/${github_repo}/releases/latest/download/firmware.bin";
+            esphome::ota::custom_backend_ota(url);
