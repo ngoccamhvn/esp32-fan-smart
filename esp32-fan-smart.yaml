@@ -2,7 +2,7 @@
 # Definition: definitions/boards/upesy_wroom/manifest.yaml
 
 substitutions:
-  fw_version: "1.0.6" 
+  fw_version: "1.0.7" 
   github_user: "ngoccamhvn" 
   github_repo: "esp32_fan_smart" # Kiểm tra chính xác tên Repo trên GitHub của anh
 
@@ -451,7 +451,7 @@ button:
               else if (id(relay_toc_do_3).state) id(relay_toc_do_1).turn_on();
             }
           }
-# THAY THẾ TOÀN BỘ KHỐI BUTTON TỪ ĐOẠN CHECK UPDATE (KHOẢNG DÒNG 450)
+# THAY THẾ TOÀN BỘ KHỐI BUTTON TỪ DÒNG KHOẢNG 450 ĐẾN HẾT NÚT UPDATE
   - platform: template
     name: "Check Firmware Update"
     id: check_update_btn
@@ -466,8 +466,8 @@ button:
             on_response:
               then:
                 - lambda: |-
-                    // Đọc nội dung chuỗi JSON trực tiếp từ biến con trỏ phản hồi hệ thống 'x'
-                    std::string body = x; 
+                    // Đọc nội dung chuỗi JSON từ biến hệ thống 'response' (thay vì 'x')
+                    std::string body = response.get_string();
                     
                     size_t pos = body.find("\"tag_name\":\"");
                     if (pos != std::string::npos) {
@@ -492,7 +492,6 @@ button:
                       ESP_LOGE("GitHub_OTA", "Không thể tìm thấy thông tin tag_name từ GitHub API.");
                     }
 
-# THAY THẾ CHÍNH XÁC KHỐI NÚT UPDATE_FIRMWARE_BTN TỪ DÒNG KHOẢNG 495
   - platform: template
     name: "Click to Update Firmware"
     id: update_firmware_btn
@@ -509,19 +508,28 @@ button:
             condition:
               lambda: 'return id(has_new_fw);'
             then:
-              # Dùng http_request thông thường để lấy file nhị phân mà không bị ép kiểm tra MD5
               - http_request.get:
                   url: "https://github.com{github_user}/${github_repo}/releases/latest/download/firmware.bin"
                   on_response:
                     then:
                       - lambda: |-
-                          // Đọc luồng dữ liệu byte thô từ kết quả phản hồi của HTTP Request
-                          auto raw_body = x;
-                          if (!raw_body.empty()) {
-                            ESP_LOGI("GitHub_OTA", "Tải file thành công (%d bytes). Tiến hành flash...", raw_body.size());
+                          // Đọc dữ liệu nhị phân từ biến response hệ thống
+                          std::string bin_body = response.get_string();
+                          if (!bin_body.empty()) {
+                            ESP_LOGI("GitHub_OTA", "Tải file thành công (%d bytes). Tiến hành flash...", bin_body.size());
                             
-                            // Gọi luồng nạp OTA gốc của hệ thống ESPHome để ghi đè dữ liệu vào chip
-                            esphome::ota::api_ota_write((const uint8_t*)raw_body.data(), raw_body.size());
+                            // Gọi cấu trúc phân vùng OTA nội bộ để tự ghi trực tiếp vào Flash
+                            auto *ota_backend = esphome::ota::get_global_ota_backend();
+                            if (ota_backend != nullptr) {
+                              ota_backend->begin(bin_body.size());
+                              ota_backend->write((const uint8_t*)bin_body.data(), bin_body.size());
+                              ota_backend->end();
+                              ESP_LOGI("GitHub_OTA", "Nạp thành công! Thiết bị đang khởi động lại...");
+                              delay(500);
+                              App.safe_reboot();
+                            } else {
+                              ESP_LOGE("GitHub_OTA", "Không thể khởi tạo bộ nhớ phân vùng OTA.");
+                            }
                           } else {
                             ESP_LOGE("GitHub_OTA", "Lỗi: File firmware tải về trống rỗng.");
                           }
