@@ -27,13 +27,19 @@ jobs:
       - name: Prepare firmware file
         run: |
           mkdir -p output_fw
-          cp -r output/* output_fw/ || true
-          find output -name "*ota.bin" -exec cp {} ./firmware.bin \;
           
-          # Nếu build action bản cũ không sinh ota.bin ngoài output, lấy trực tiếp từ thư mục build của esp32-fan-smart
+          # Thuật toán quét tìm tự động mọi file firmware.bin hoặc ota.bin nằm sâu trong thư mục build ẩn
+          find .esphome/build/ -name "firmware.bin" -exec cp {} ./firmware.bin \;
+          find .esphome/build/ -name "*ota.bin" -exec cp {} ./firmware.bin \;
+          
+          # Kiểm tra nếu vẫn không tìm thấy thì báo lỗi rõ ràng
           if [ ! -f ./firmware.bin ]; then
-            mv .esphome/build/esp32-fan-smart/.pioenvs/esp32-fan-smart/firmware.bin ./firmware.bin
+            echo "LỖI: Không tìm thấy file firmware được tạo ra sau khi biên dịch!"
+            exit 1
           fi
+          
+          echo "Thành công: Đã tìm thấy file firmware và chuẩn bị đưa lên Release."
+
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
