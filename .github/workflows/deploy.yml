@@ -5,7 +5,7 @@ on:
     branches:
       - main 
     paths:
-      - 'esp32-fan-smart.yaml' # Chỉ chạy khi file này thay đổi
+      - 'esp32-fan-smart.yaml'
 
 permissions:
   contents: write 
@@ -21,25 +21,18 @@ jobs:
         id: esphome-build
         uses: esphome/build-action@v7
         with:
-          yaml-file: esp32-fan-smart.yaml # Đổi tên file yaml cần build
+          yaml-file: esp32-fan-smart.yaml
           version: latest
 
       - name: Prepare firmware file
         run: |
           mkdir -p output_fw
-          
-          # Thuật toán quét tìm tự động mọi file firmware.bin hoặc ota.bin nằm sâu trong thư mục build ẩn
           find .esphome/build/ -name "firmware.bin" -exec cp {} ./firmware.bin \;
           find .esphome/build/ -name "*ota.bin" -exec cp {} ./firmware.bin \;
-          
-          # Kiểm tra nếu vẫn không tìm thấy thì báo lỗi rõ ràng
           if [ ! -f ./firmware.bin ]; then
-            echo "LỖI: Không tìm thấy file firmware được tạo ra sau khi biên dịch!"
+            echo "LỖI: Không tìm thấy file firmware!"
             exit 1
           fi
-          
-          echo "Thành công: Đã tìm thấy file firmware và chuẩn bị đưa lên Release."
-
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -47,7 +40,7 @@ jobs:
           tag_name: v${{ github.run_number }} 
           name: Release v${{ github.run_number }}
           body: |
-            Tự động biên dịch Firmware cho esp32-fan-smart.
+            Tự động biên dịch Firmware cho esp32-fan-smart thành công.
             Mã commit: ${{ github.sha }}
           files: firmware.bin
         env:
