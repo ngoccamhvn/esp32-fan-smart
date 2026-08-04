@@ -16,13 +16,15 @@ esphome:
     - github_ota.h # <-- CHÈN THÊM DÒNG NÀY VÀO ĐÂY
 
 
-# SỬA LẠI KHỐI ESP32 Ở ĐẦU FILE CỦA ANH
+# SỬA LẠI CHÍNH XÁC KHỐI ESP32 TRONG FILE esp32-fan-smart.yaml
 esp32:
-  board: esp32dev # Chuyển về bo mạch chuẩn để phân vùng nhớ OTA rộng rãi hơn
+  board: esp32dev
   variant: esp32
   framework:
     type: esp-idf
-    version: 5.1.2 # Khóa cứng phiên bản ổn định, tránh lỗi biên dịch của bản 2026 mới
+    version: 5.1.2
+  platform_version: 6.5.0 # CHÈN THÊM DÒNG NÀY ĐỂ ĐỒNG BỘ THƯ VIỆN ĐÚNG YÊU CẦU
+
 
 
 api:
