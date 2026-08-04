@@ -1,6 +1,6 @@
 
 substitutions:
-  fw_version: "1.0.3" 
+  fw_version: "1.0.4" 
   github_user: "ngoccamhvn" 
   github_repo: "esp32_fan_smart" # Kiểm tra chính xác tên Repo trên GitHub của anh
 
@@ -62,8 +62,20 @@ text_sensor:
     name: "Latest Version Available"
     id: latest_version
     icon: "mdi:github"
-    
-  # Ô hiển thị tiến trình học Lệnh lên màn hình Home Assistant
+    # Cứ mỗi 2 giây, cảm biến tự động kiểm tra xem luồng ngầm đã lấy được version mới từ github về chưa
+    update_interval: 2s
+    lambda: |-
+      std::string new_ver = esphome::GitHubOTA::get_new_version();
+      if (!new_ver.empty()) {
+        // Nếu có bản mới khác bản hiện tại, tự động bật cờ cho phép update
+        if (new_ver != "${fw_version}") {
+          id(has_new_fw) = true;
+        } else {
+          id(has_new_fw) = false;
+        }
+        return {new_ver};
+      }
+      return {"Chưa kiểm tra"};
 
   - platform: template
     name: "Trạng thái học lệnh IR"
@@ -456,26 +468,16 @@ button:
               else if (id(relay_toc_do_3).state) id(relay_toc_do_1).turn_on();
             }
           }
-# THAY THẾ CHÍNH XÁC KHỐI NÚT TỪ DÒNG CHECK UPDATE (KHOẢNG DÒNG 450)
   - platform: template
     name: "Check Firmware Update"
     id: check_update_btn
     icon: "mdi:cloud-check"
     on_press:
       then:
-        - logger.log: "Đang gửi yêu cầu kiểm tra phiên bản mới tới luồng ngầm..."
+        - logger.log: "Đang yêu cầu kiểm tra phiên bản mới từ luồng ngầm..."
         - lambda: |-
-            // GIẢI PHÁP VẠN NĂNG: Tạo một hàm Lambda C++ nhỏ chạy tại chỗ 
-            // Hàm này sẽ tự động ép kiểu và trích xuất chính xác địa chỉ con trỏ của biến global bất kể tên biến ngầm là gì
-            auto get_global_ptr = [&]() {
-              return id(has_new_fw); 
-            };
-            
-            // Ép kiểu ngược từ tham chiếu Lambda sang con trỏ cấu trúc dữ liệu quản lý biến
-            auto *global_ptr = (esphome::globals::GlobalsComponent<bool>*)((void*)&get_global_ptr);
-
-            // Gọi luồng check an toàn tuyệt đối với con trỏ vừa lấy được
-            GitHubOTA::start_check("${github_user}", "${github_repo}", "${fw_version}", id(latest_version), global_ptr);
+            // Gọi lệnh kiểm tra chạy ngầm hoàn toàn sạch sẽ, không giữ con trỏ
+            esphome::GitHubOTA::start_check("${github_user}", "${github_repo}", "${fw_version}");
 
   - platform: template
     name: "Click to Update Firmware"
@@ -485,8 +487,9 @@ button:
       then:
         - lambda: |-
             if (id(has_new_fw)) {
+              ESP_LOGI("GitHub_OTA", "Đang tải firmware từ GitHub...");
               std::string url = "https://github.com{github_user}/${github_repo}/releases/latest/download/firmware.bin";
-              GitHubOTA::start_update(url);
+              esphome::GitHubOTA::start_update(url);
             } else {
-              ESP_LOGW("GitHub_OTA", "Khong co ban cap nhat moi nao duoc phat hien. Hay an nut Check truoc!");
+              ESP_LOGW("GitHub_OTA", "Không có bản cập nhật mới. Vui lòng nhấn nút Check trước!");
             }
