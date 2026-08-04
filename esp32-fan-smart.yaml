@@ -465,8 +465,8 @@ button:
       then:
         - logger.log: "Đang gửi yêu cầu kiểm tra phiên bản mới tới luồng ngầm..."
         - lambda: |-
-            // Sửa lỗi: Thêm hậu tố _global để truyền chính xác con trỏ cấu trúc quản lý biến toàn cục vào file .h
-            GitHubOTA::start_check("${github_user}", "${github_repo}", "${fw_version}", id(latest_version), has_new_fw_global);
+            // SỬA LẠI ĐÚNG ĐỊNH DANH BIẾN TOÀN CỤC CỦA ESPHOME: globals_has_new_fw
+            GitHubOTA::start_check("${github_user}", "${github_repo}", "${fw_version}", id(latest_version), globals_has_new_fw);
 
   - platform: template
     name: "Click to Update Firmware"
