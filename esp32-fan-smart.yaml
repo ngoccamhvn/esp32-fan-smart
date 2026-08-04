@@ -1,5 +1,5 @@
 substitutions:
-  fw_version: "1.0.4" 
+  fw_version: "1.0.5" 
   github_user: "ngoccamhvn" 
   github_repo: "esp32_fan_smart" 
 
@@ -458,6 +458,7 @@ button:
             url: "https://github.com"
             headers:
               User-Agent: "esphome-device"
+              # CHÈN CHÍNH XÁC DÒNG TIÊU ĐỀ NÀY ĐỂ GITHUB CHẤP NHẬN REQUEST
               Accept: "application/vnd.github.v3+json"
             on_response:
               then:
@@ -467,16 +468,15 @@ button:
                       pos += 12; 
                       size_t end_pos = body.find("\"", pos);
                       std::string new_ver = body.substr(pos, end_pos - pos);
-                      
-                      if (new_ver.rfind("v", 0) == 0) {
-                        new_ver = new_ver.substr(1);
-                      }
+                      if (new_ver.rfind("v", 0) == 0) new_ver = new_ver.substr(1);
                       
                       id(latest_version).publish_state(new_ver);
                       
                       if (new_ver != "${fw_version}") {
-                        ESP_LOGI("GitHub_OTA", "Phat hien ban moi: %s. Hay vao muc Releases tren GitHub tai file .bin de nap o giao dien ben duoi!", new_ver.c_str());
+                        id(has_new_fw) = true;
+                        ESP_LOGI("GitHub_OTA", "Phat hien ban moi: %s.", new_ver.c_str());
                       } else {
+                        id(has_new_fw) = false;
                         ESP_LOGI("GitHub_OTA", "Firmware hien tai da la moi nhat.");
                       }
                     }
