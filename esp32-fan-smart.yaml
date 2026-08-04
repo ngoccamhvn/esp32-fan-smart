@@ -1,5 +1,5 @@
 substitutions:
-  fw_version: "1.0.6" 
+  fw_version: "1.0.7" 
   github_user: "ngoccamhvn" 
   github_repo: "esp32_fan_smart" 
 
@@ -455,28 +455,36 @@ button:
       then:
         - logger.log: "Đang gọi kiểm tra phiên bản mới từ GitHub..."
         - http_request.get:
+            # ĐÃ SỬA CHUẨN ĐƯỜNG DẪN API GỐC CỦA GITHUB (Thay vì đường dẫn github.com cũ)
             url: "https://github.com"
             headers:
               User-Agent: "esphome-device"
-              # CHÈN CHÍNH XÁC DÒNG TIÊU ĐỀ NÀY ĐỂ GITHUB CHẤP NHẬN REQUEST
+              # ĐÃ THÊM KHAI BÁO BẮT BUỘC ĐỂ GITHUB TRẢ VỀ CHUỖI JSON SẠCH
               Accept: "application/vnd.github.v3+json"
             on_response:
               then:
                 - lambda: |-
+                    // Tiến hành phân tích chuỗi văn bản JSON trả về từ API
                     size_t pos = body.find("\"tag_name\":\"");
                     if (pos != std::string::npos) {
                       pos += 12; 
                       size_t end_pos = body.find("\"", pos);
                       std::string new_ver = body.substr(pos, end_pos - pos);
-                      if (new_ver.rfind("v", 0) == 0) new_ver = new_ver.substr(1);
                       
+                      if (new_ver.rfind("v", 0) == 0) {
+                        new_ver = new_ver.substr(1);
+                      }
+                      
+                      // Cập nhật trạng thái hiển thị số phiên bản lên giao diện
                       id(latest_version).publish_state(new_ver);
                       
                       if (new_ver != "${fw_version}") {
                         id(has_new_fw) = true;
-                        ESP_LOGI("GitHub_OTA", "Phat hien ban moi: %s.", new_ver.c_str());
+                        ESP_LOGI("GitHub_OTA", "Phat hien ban moi: %s. San sang cap nhat.", new_ver.c_str());
                       } else {
                         id(has_new_fw) = false;
                         ESP_LOGI("GitHub_OTA", "Firmware hien tai da la moi nhat.");
                       }
+                    } else {
+                      ESP_LOGE("GitHub_OTA", "Khong tim thay truong tag_name trong chuoi JSON.");
                     }
