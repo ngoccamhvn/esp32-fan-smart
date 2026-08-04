@@ -6,19 +6,17 @@
 
 namespace esphome {
 
-// Khai báo trước các biến toàn cục từ ESPHome sang C++ để đồng bộ dữ liệu ngầm
-extern text_sensor::TemplateTextSensor *latest_version;
-extern globals::GlobalsComponent<bool> *has_new_fw;
-
 class GitHubOTA {
 private:
     struct CheckParam {
         std::string user;
         std::string repo;
         std::string current_ver;
+        text_sensor::TextSensor *sensor_id;
+        globals::GlobalsComponent<bool> *global_id;
     };
 
-    // Luồng ngầm 1: Tự động kết nối GitHub API lấy phiên bản mà không gây treo quạt
+    // Luồng ngầm 1: Kiểm tra phiên bản độc lập
     static void check_version_task(void *pvParameters) {
         CheckParam *param = (CheckParam *)pvParameters;
         std::string url = "https://github.com" + param->user + "/" + param->repo + "/releases/latest";
@@ -35,7 +33,6 @@ private:
         
         if (esp_http_client_open(client, 0) == ESP_OK) {
             esp_http_client_fetch_headers(client);
-            // Cấp phát bộ đệm lớn để hứng trọn gói tin phản hồi của GitHub JSON
             char *buffer = (char *)malloc(1024);
             if (buffer != nullptr) {
                 int read_len = esp_http_client_read(client, buffer, 1023);
@@ -53,30 +50,29 @@ private:
                             new_ver = new_ver.substr(1);
                         }
                         
-                        // Đẩy dữ liệu an toàn về lại giao diện ESPHome thông qua hàng đợi luồng
-                        esphome::App.feed_wdt();
-                        latest_version->publish_state(new_ver);
+                        // Đẩy trạng thái về giao diện qua con trỏ được truyền vào
+                        param->sensor_id->publish_state(new_ver);
                         
                         if (new_ver != param->current_ver) {
-                            has_new_fw->value() = true;
-                            ESP_LOGI("GitHub_OTA", "Phát hiện bản mới: %s. Đã mở khóa nút Cập nhật.", new_ver.c_str());
+                            param->global_id->value() = true;
+                            ESP_LOGI("GitHub_OTA", "Phat hien ban moi: %s. San sang cap nhat.", new_ver.c_str());
                         } else {
-                            has_new_fw->value() = false;
-                            ESP_LOGI("GitHub_OTA", "Mã nguồn hiện tại đã là mới nhất.");
+                            param->global_id->value() = false;
+                            ESP_LOGI("GitHub_OTA", "Phan mem hien tai da la moi nhat.");
                         }
                     }
                 }
                 free(buffer);
             }
         } else {
-            ESP_LOGE("GitHub_OTA", "Lỗi: Không thể kết nối tới GitHub API (Kiểm tra Internet của ESP32)");
+            ESP_LOGE("GitHub_OTA", "Loi: Khong the ket noi toi GitHub API");
         }
         esp_http_client_cleanup(client);
         delete param;
         vTaskDelete(NULL);
     }
 
-    // Luồng ngầm 2: Tự động kéo file .bin nặng vài MB từ GitHub về nạp đè vào Flash
+    // Luồng ngầm 2: Tải file dung lượng lớn và tự Flash OTA
     static void ota_task(void *pvParameters) {
         std::string *url = (std::string *)pvParameters;
         
@@ -90,19 +86,20 @@ private:
 
         esp_err_t ret = esp_https_ota(&ota_config);
         if (ret == ESP_OK) {
-            ESP_LOGI("GitHub_OTA", "Nạp phần mềm thành công! Chip tự khởi động lại...");
+            ESP_LOGI("GitHub_OTA", "Cap nhat thanh cong! Dang khoi dong lai chip...");
             delay(1000);
             esp_restart();
         } else {
-            ESP_LOGE("GitHub_OTA", "Lỗi quy trình nạp OTA từ xa thất bại: %d", ret);
+            ESP_LOGE("GitHub_OTA", "Loi nạp firmware tu xa that bai: %d", ret);
         }
         delete url;
         vTaskDelete(NULL);
     }
 
 public:
-    static void start_check(const std::string &user, const std::string &repo, const std::string &current_ver) {
-        CheckParam *param = new CheckParam{user, repo, current_ver};
+    // Nhận trực tiếp con trỏ đối tượng từ file .yaml truyền sang
+    static void start_check(const std::string &user, const std::string &repo, const std::string &current_ver, text_sensor::TextSensor *sensor_id, globals::GlobalsComponent<bool> *global_id) {
+        CheckParam *param = new CheckParam{user, repo, current_ver, sensor_id, global_id};
         xTaskCreate(&GitHubOTA::check_version_task, "check_ver_task", 6144, param, 5, NULL);
     }
 
