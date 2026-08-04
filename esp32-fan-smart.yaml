@@ -57,10 +57,12 @@ captive_portal:
 logger:
   baud_rate: 0
     
-# SỬA LẠI ĐÚNG THẲNG HÀNG SÁT LỀ TRÁI (KHOẢNG DÒNG 50)
+# SỬA LẠI ĐOẠN KHỐI HTTP_REQUEST (KHOẢNG DÒNG 62)
 http_request:
   useragent: esphome-device
   timeout: 10s
+  verify_ssl: false # CHÈN THÊM DÒNG NÀY ĐỂ BỎ QUA XÁC THỰC SSL TRÊN ARDUINO CORE
+
 
 text_sensor:
   - platform: template
