@@ -20,8 +20,7 @@ esp32:
 
 
 api:
-  encryption:
-    key: "9z61dUq7DVQB9fRsvqdPfAAokP6T1faELaNAXk6GVuw="
+
 
 ota:
   - platform: esphome
