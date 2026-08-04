@@ -463,10 +463,10 @@ button:
     icon: "mdi:cloud-check"
     on_press:
       then:
-        - logger.log: "Đang yêu cầu kiểm tra phiên bản mới từ luồng ngầm..."
+        - logger.log: "Đang gửi yêu cầu kiểm tra phiên bản mới tới luồng ngầm..."
         - lambda: |-
-            // Kích hoạt luồng kiểm tra chạy tách biệt với hệ thống quạt
-            GitHubOTA::start_check("${github_user}", "${github_repo}", "${fw_version}");
+            // Truyền trực tiếp ID cảm biến và ID biến global vào hàm xử lý của file .h
+            GitHubOTA::start_check("${github_user}", "${github_repo}", "${fw_version}", id(latest_version), id(has_new_fw));
 
   - platform: template
     name: "Click to Update Firmware"
@@ -477,8 +477,7 @@ button:
         - lambda: |-
             if (id(has_new_fw)) {
               std::string url = "https://github.com{github_user}/${github_repo}/releases/latest/download/firmware.bin";
-              // Kích hoạt luồng tải và nạp flash chạy độc lập
               GitHubOTA::start_update(url);
             } else {
-              ESP_LOGW("GitHub_OTA", "Không có bản cập nhật mới nào được phát hiện trước đó.");
+              ESP_LOGW("GitHub_OTA", "Khong co ban cap nhat moi nao duoc phat hien. Hay an nut Check truoc!");
             }
