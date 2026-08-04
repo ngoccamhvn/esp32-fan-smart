@@ -17,43 +17,32 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # BƯỚC MỚI: Tự động trích xuất số phiên bản từ file yaml
-      - name: Get firmware version
-        id: get_ver
-        run: |
-          VERSION=$(grep 'fw_version:' esp32-fan-smart.yaml | head -n1 | awk '{print $2}' | tr -d '"' | tr -d "'")
-          echo "FW_VERSION=$VERSION" >> $GITHUB_ENV
-          echo "Dự án đang ở phiên bản: $VERSION"
-
-# SỬA LẠI ĐOẠN NÀY TRONG FILE deploy.yml
       - name: Set up and Compile ESPHome
         id: esphome-build
         uses: esphome/build-action@v7
         with:
           yaml-file: esp32-fan-smart.yaml
-          version: 2024.12.2 # Đổi từ latest thành bản ổn định này
-
+          version: 2024.12.2
 
       - name: Prepare firmware file
         run: |
           mkdir -p output_fw
-          find .esphome/build/ -name "firmware.bin" -exec cp {} ./firmware.bin \;
-          find .esphome/build/ -name "*ota.bin" -exec cp {} ./firmware.bin \;
-          if [ ! -f ./firmware.bin ]; then
-            echo "LỖI: Không tìm thấy file firmware!"
+          # Tự động quét và tìm file factory tổng hợp (chứa sẵn bootloader phần cứng)
+          find .esphome/build/ -name "*factory.bin" -exec cp {} ./firmware-factory.bin \;
+          
+          if [ ! -f ./firmware-factory.bin ]; then
+            echo "LỖI: Không tìm thấy file factory tổng hợp!"
             exit 1
           fi
 
-      # BƯỚC TẠO RELEASE: Sử dụng biến môi trường đã trích xuất an toàn
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ env.FW_VERSION }}
-          name: Release v${{ env.FW_VERSION }}
+          tag_name: v${{ github.run_number }}
+          name: Release v${{ github.run_number }}
           body: |
-            Tự động biên dịch Firmware cho esp32-fan-smart thành công.
-            Phiên bản cấu hình: v${{ env.FW_VERSION }}
-            Mã commit: ${{ github.sha }}
-          files: firmware.bin
+            Tự động biên dịch Firmware tổng hợp cho esp32-fan-smart thành công.
+          files: |
+            firmware-factory.bin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
