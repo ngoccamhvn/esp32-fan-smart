@@ -1,6 +1,6 @@
 
 substitutions:
-  fw_version: "1.0.2" 
+  fw_version: "1.0.3" 
   github_user: "ngoccamhvn" 
   github_repo: "esp32_fan_smart" # Kiểm tra chính xác tên Repo trên GitHub của anh
 
@@ -456,40 +456,17 @@ button:
               else if (id(relay_toc_do_3).state) id(relay_toc_do_1).turn_on();
             }
           }
-# THAY THẾ TOÀN BỘ KHỐI BUTTON TỪ DÒNG KHOẢNG 450 ĐẾN HẾT NÚT CLICK TO UPDATE
+# THAY THẾ CHÍNH XÁC KHỐI NÚT TỪ DÒNG CHECK UPDATE (KHOẢNG DÒNG 450)
   - platform: template
     name: "Check Firmware Update"
     id: check_update_btn
     icon: "mdi:cloud-check"
     on_press:
       then:
-        - logger.log: "Đang kiểm tra phiên bản mới từ GitHub..."
+        - logger.log: "Đang yêu cầu kiểm tra phiên bản mới từ luồng ngầm..."
         - lambda: |-
-            // Gọi hàm check_version từ file github_ota.h
-            std::string body = GitHubOTA::check_version("${github_user}", "${github_repo}");
-            
-            size_t pos = body.find("\"tag_name\":\"");
-            if (pos != std::string::npos) {
-              pos += 12; 
-              size_t end_pos = body.find("\"", pos);
-              std::string new_ver = body.substr(pos, end_pos - pos);
-              
-              if (new_ver.rfind("v", 0) == 0) {
-                new_ver = new_ver.substr(1);
-              }
-              
-              id(latest_version).publish_state(new_ver);
-              
-              if (new_ver != "${fw_version}") {
-                id(has_new_fw) = true;
-                ESP_LOGI("GitHub_OTA", "Phát hiện bản cập nhật mới: %s. Sẵn sàng cập nhật.", new_ver.c_str());
-              } else {
-                id(has_new_fw) = false;
-                ESP_LOGI("GitHub_OTA", "Firmware hiện tại (%s) đã là mới nhất.", new_ver.c_str());
-              }
-            } else {
-              ESP_LOGE("GitHub_OTA", "Không lấy được dữ liệu từ GitHub hoặc kho lưu trữ ở chế độ riêng tư (Private).");
-            }
+            // Kích hoạt luồng kiểm tra chạy tách biệt với hệ thống quạt
+            GitHubOTA::start_check("${github_user}", "${github_repo}", "${fw_version}");
 
   - platform: template
     name: "Click to Update Firmware"
@@ -500,7 +477,8 @@ button:
         - lambda: |-
             if (id(has_new_fw)) {
               std::string url = "https://github.com{github_user}/${github_repo}/releases/latest/download/firmware.bin";
+              // Kích hoạt luồng tải và nạp flash chạy độc lập
               GitHubOTA::start_update(url);
             } else {
-              ESP_LOGW("GitHub_OTA", "Không có bản cập nhật mới nào để thực hiện.");
+              ESP_LOGW("GitHub_OTA", "Không có bản cập nhật mới nào được phát hiện trước đó.");
             }
