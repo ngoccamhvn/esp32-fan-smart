@@ -1,5 +1,5 @@
 substitutions:
-  fw_version: "1.0.1" 
+  fw_version: "1.0.2" 
   github_user: "ngoccamhvn" 
   github_repo: "esp32_fan_smart" 
 
@@ -25,7 +25,6 @@ api:
 
 ota:
   - platform: esphome
-  - platform: http_request
 
 
 web_server:
@@ -477,31 +476,8 @@ button:
                       id(latest_version).publish_state(new_ver);
                       
                       if (new_ver != "${fw_version}") {
-                        id(has_new_fw) = true;
-                        ESP_LOGI("GitHub_OTA", "Phát hiện bản mới: %s. Đã mở khóa nút Cập nhật.", new_ver.c_str());
+                        ESP_LOGI("GitHub_OTA", "Phat hien ban moi: %s. Hay vao muc Releases tren GitHub tai file .bin de nap o giao dien ben duoi!", new_ver.c_str());
                       } else {
-                        id(has_new_fw) = false;
-                        ESP_LOGI("GitHub_OTA", "Firmware hiện tại đã là mới nhất.");
+                        ESP_LOGI("GitHub_OTA", "Firmware hien tai da la moi nhat.");
                       }
                     }
-
-  - platform: template
-    name: "Click to Update Firmware"
-    id: update_firmware_btn
-    icon: "mdi:cloud-download"
-    on_press:
-      then:
-        - lambda: |-
-            if (id(has_new_fw)) {
-              ESP_LOGI("GitHub_OTA", "Đang truyền liên kết tải xuống tới bộ nạp Native...");
-            } else {
-              ESP_LOGW("GitHub_OTA", "Không có bản cập nhật mới. Vui lòng nhấn nút Check trước!");
-            }
-        - if:
-            condition:
-              lambda: 'return id(has_new_fw);'
-            then:
-              # GIẢI PHÁP NATIVE TUYỆT ĐỐI: Điền mã MD5 giả lập 32 ký tự để vượt qua bộ lọc biên dịch
-              - ota.http_request.flash:
-                  url: "https://github.com"
-                  md5: "00000000000000000000000000000000"
