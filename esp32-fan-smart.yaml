@@ -22,7 +22,15 @@ esp32:
   variant: esp32
   framework:
     type: arduino
-  partitions: huge_app.csv # Đã sửa thành "partitions:" chuẩn cấu trúc ESPHome
+  # ÉP HỆ THỐNG PHÂN CHIA 2 Ổ OTA LỚN TRỰC TIẾP (Bỏ khai báo file .csv gây lỗi)
+  partitions:
+    - nvs,      data, nvs,     0x9000,  0x5000
+    - otadata,  data, ota,     0xe000,  0x2000
+    - app0,     app,  ota_0,   0x10000, 0x1D0000
+    - app1,     app,  ota_1,   0x1E0000,0x1D0000
+    - eeprom,   data, setup,   0x3B0000,0x1000
+    - spiffs,   data, spiffs,  0x3B1000,0x4F0000
+
 
 
 
