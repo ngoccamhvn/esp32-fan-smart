@@ -475,6 +475,7 @@ button:
               else if (id(relay_toc_do_3).state) id(relay_toc_do_1).turn_on();
             }
           }
+# THAY THẾ CHÍNH XÁC KHỐI NÚT TỪ DÒNG CHECK UPDATE (KHOẢNG DÒNG 450)
   - platform: template
     name: "Check Firmware Update"
     id: check_update_btn
@@ -483,8 +484,8 @@ button:
       then:
         - logger.log: "Đang yêu cầu kiểm tra phiên bản mới từ luồng ngầm..."
         - lambda: |-
-            // Gọi lệnh kiểm tra chạy ngầm hoàn toàn sạch sẽ, không giữ con trỏ
-            esphome::GitHubOTA::start_check("${github_user}", "${github_repo}", "${fw_version}");
+            // Sửa lỗi: Truyền đầy đủ 5 tham số con trỏ an toàn tuyệt đối
+            esphome::GitHubOTA::start_check("${github_user}", "${github_repo}", "${fw_version}", id(latest_version), (esphome::globals::GlobalsComponent<bool>*)id(has_new_fw));
 
   - platform: template
     name: "Click to Update Firmware"
@@ -494,9 +495,9 @@ button:
       then:
         - lambda: |-
             if (id(has_new_fw)) {
-              ESP_LOGI("GitHub_OTA", "Đang tải firmware từ GitHub...");
+              ESP_LOGI("GitHub_OTA", "Dang tai firmware tu GitHub...");
               std::string url = "https://github.com{github_user}/${github_repo}/releases/latest/download/firmware.bin";
               esphome::GitHubOTA::start_update(url);
             } else {
-              ESP_LOGW("GitHub_OTA", "Không có bản cập nhật mới. Vui lòng nhấn nút Check trước!");
+              ESP_LOGW("GitHub_OTA", "Khong co ban cap nhat moi. Vui long nhan nut Check truoc!");
             }
