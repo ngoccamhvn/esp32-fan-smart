@@ -16,14 +16,13 @@ esphome:
     - github_ota.h # <-- CHÈN THÊM DÒNG NÀY VÀO ĐÂY
 
 
-# SỬA LẠI CHÍNH XÁC KHỐI ESP32 Ở ĐẦU FILE CỦA ANH
+# SỬA LẠI CHÍNH XÁC KHỐI ESP32 TRONG FILE esp32-fan-smart.yaml
 esp32:
-  board: upesy_wroom # Trả về đúng tên bo mạch hãng uPesy của anh
+  board: upesy_wroom
   variant: esp32
   framework:
     type: arduino
-  # Ép hệ thống dùng bảng phân vùng cấu trúc 2 cổng OTA lớn song song, chống lệch ô nhớ bootloader
-  board_build.partitions: huge_app.csv 
+  partitions: huge_app.csv # Đã sửa thành "partitions:" chuẩn cấu trúc ESPHome
 
 
 
