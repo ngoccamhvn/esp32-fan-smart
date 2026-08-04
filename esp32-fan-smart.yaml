@@ -1,6 +1,6 @@
 
 substitutions:
-  fw_version: "1.0.5" 
+  fw_version: "1.0.6" 
   github_user: "ngoccamhvn" 
   github_repo: "esp32_fan_smart" # Kiểm tra chính xác tên Repo trên GitHub của anh
 
@@ -16,12 +16,12 @@ esphome:
     - github_ota.h # <-- CHÈN THÊM DÒNG NÀY VÀO ĐÂY
 
 
-# SỬA LẠI THẬT GỌN KHỐI ESP32 (KHOẢNG DÒNG 21)
+# SỬA LẠI CHÍNH XÁC KHỐI ESP32 Ở ĐẦU FILE CỦA ANH
 esp32:
   board: esp32dev
   variant: esp32
   framework:
-    type: esp-idf # Để hệ thống tự động chọn bản build phù hợp nhất
+    type: arduino # Đổi từ esp-idf sang arduino để phân vùng nhớ tự động co giãn hoàn hảo
 
 
 
