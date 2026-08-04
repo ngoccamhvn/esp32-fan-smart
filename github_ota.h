@@ -101,7 +101,8 @@ private:
                     }
                     free(ota_write_data);
                     
-                    if (esp_ota_end(update_handle) == ESP_OK && esp_ota_set_as_boot_partition(update_partition) == ESP_OK) {
+                    // ĐÃ SỬA: Thay thế esp_ota_set_as_boot_partition thành esp_ota_set_boot_partition chuẩn SDK
+                    if (esp_ota_end(update_handle) == ESP_OK && esp_ota_set_boot_partition(update_partition) == ESP_OK) {
                         ESP_LOGI("GitHub_OTA", "Cap nhat hoan tat! Chip tu khoi dong lai...");
                         delay(1000);
                         esp_restart();
@@ -109,7 +110,7 @@ private:
                         ESP_LOGE("GitHub_OTA", "Loi ket thuc ghi hoac set boot partition.");
                     }
                 } else {
-                    ESP_LOGE("GitHub_OTA", "Khong the khoi tao phan vung OTA.");
+                    ESP_LOGE("GitHub_OTA", "Khong du bo nho trong de thuc hien ghi OTA.");
                 }
             }
         } else {
