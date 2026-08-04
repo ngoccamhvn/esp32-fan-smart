@@ -1,6 +1,6 @@
 
 substitutions:
-  fw_version: "1.1.1" 
+  fw_version: "1.1.2" 
   github_user: "ngoccamhvn" 
   github_repo: "esp32_fan_smart" # Kiểm tra chính xác tên Repo trên GitHub của anh
 
@@ -463,37 +463,10 @@ button:
     icon: "mdi:cloud-check"
     on_press:
       then:
-        - http_request.get:
-            url: "https://github.com"
-            headers:
-              User-Agent: "esphome-device"
-              Accept: "application/vnd.github.v3+json"
-            on_response:
-              then:
-                - lambda: |-
-                    // ESPHome 2024 tự đẻ sẵn biến 'body'. Ta dùng thuật toán tìm chuỗi trực tiếp trên nó:
-                    size_t pos = body.find("\"tag_name\":\"");
-                    if (pos != std::string::npos) {
-                      pos += 12; 
-                      size_t end_pos = body.find("\"", pos);
-                      std::string new_ver = body.substr(pos, end_pos - pos);
-                      
-                      if (new_ver.rfind("v", 0) == 0) {
-                        new_ver = new_ver.substr(1);
-                      }
-                      
-                      id(latest_version).publish_state(new_ver);
-                      
-                      if (new_ver != "${fw_version}") {
-                        id(has_new_fw) = true;
-                        ESP_LOGI("GitHub_OTA", "Phat hien ban moi: %s. San sang cap nhat.", new_ver.c_str());
-                      } else {
-                        id(has_new_fw) = false;
-                        ESP_LOGI("GitHub_OTA", "Firmware hien tai da la moi nhat.");
-                      }
-                    } else {
-                      ESP_LOGE("GitHub_OTA", "Khong tim thay thong tin tag_name tu GitHub API.");
-                    }
+        - logger.log: "Đang yêu cầu kiểm tra phiên bản từ luồng ngầm an toàn..."
+        - lambda: |-
+            // Gọi hàm check an toàn, truyền ID cảm biến và ID biến global trực tiếp
+            esphome::NativeOTA::start_check(id(latest_version), (esphome::globals::GlobalsComponent<bool>*)id(has_new_fw), "${fw_version}");
 
   - platform: template
     name: "Click to Update Firmware"
@@ -503,8 +476,8 @@ button:
       then:
         - lambda: |-
             if (id(has_new_fw)) {
-              // Gọi hàm nạp ngầm FreeRTOS chính xác từ file native_ota.h
-              esphome::NativeOTA::start_update("https://github.com");
+              // Kích hoạt lệnh nạp tĩnh hoàn toàn cách ly chuỗi ký tự
+              esphome::NativeOTA::start_update();
             } else {
               ESP_LOGW("GitHub_OTA", "Khong co ban cap nhat moi. Vui long nhan nut Check truoc!");
             }
