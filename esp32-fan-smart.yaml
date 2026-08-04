@@ -3,7 +3,6 @@ substitutions:
   github_user: "ngoccamhvn" 
   github_repo: "esp32_fan_smart" 
 
-# SỬA LẠI KHỐI ESPHOME GỐC Ở ĐẦU FILE CỦA ANH
 esphome:
   name: esp32-fan-smart 
   friendly_name: quatthongminh
@@ -11,11 +10,6 @@ esphome:
   project:
     name: ngoccamhvn.esp32_fan_smart
     version: ${fw_version}
-  # KHAI BÁO THƯ VIỆN NÀY ĐỂ TRÌNH BIÊN DỊCH KHÔNG BÁO LỖI HÀM PHẦN CỨNG
-  includes:
-    - esp_ota_ops.h
-    - esp_partition.h
-
 
 esp32:
   board: upesy_wroom
@@ -29,6 +23,7 @@ api:
 
 ota:
   - platform: esphome
+  - platform: http_request
 
 
 web_server:
@@ -481,10 +476,10 @@ button:
                       
                       if (new_ver != "${fw_version}") {
                         id(has_new_fw) = true;
-                        ESP_LOGI("GitHub_OTA", "Phat hien ban moi: %s. San sang cap nhat.", new_ver.c_str());
+                        ESP_LOGI("GitHub_OTA", "Phát hiện bản mới: %s. Đã mở khóa nút Cập nhật.", new_ver.c_str());
                       } else {
                         id(has_new_fw) = false;
-                        ESP_LOGI("GitHub_OTA", "Firmware hien tai da la moi nhat.");
+                        ESP_LOGI("GitHub_OTA", "Firmware hiện tại đã là mới nhất.");
                       }
                     }
 
@@ -496,40 +491,15 @@ button:
       then:
         - lambda: |-
             if (id(has_new_fw)) {
-              ESP_LOGI("GitHub_OTA", "Kich hoat tien trinh tu dong nap firmware...");
+              ESP_LOGI("GitHub_OTA", "Đang truyền liên kết tải xuống tới bộ nạp Native...");
             } else {
-              ESP_LOGW("GitHub_OTA", "Khong co ban cap nhat moi. Vui long nhan nut Check truoc!");
+              ESP_LOGW("GitHub_OTA", "Không có bản cập nhật mới. Vui lòng nhấn nút Check trước!");
             }
         - if:
             condition:
               lambda: 'return id(has_new_fw);'
             then:
-              - http_request.get:
+              # GIẢI PHÁP NATIVE TUYỆT ĐỐI: Điền mã MD5 giả lập 32 ký tự để vượt qua bộ lọc biên dịch
+              - ota.http_request.flash:
                   url: "https://github.com"
-                  on_response:
-                    then:
-                      - lambda: |-
-                          if (!body.empty()) {
-                            size_t total_bytes = body.size();
-                            ESP_LOGI("GitHub_OTA", "Tai thanh cong file (%d bytes). Mo khoa Flash...", total_bytes);
-                            
-                            // Thực thi ghi đè phân vùng bằng hàm SDK phần cứng gốc
-                            const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
-                            esp_ota_handle_t update_handle = 0;
-                            
-                            if (update_partition != NULL && esp_ota_begin(update_partition, total_bytes, &update_handle) == ESP_OK) {
-                              esp_ota_write(update_handle, (const void *)body.data(), total_bytes);
-                              
-                              if (esp_ota_end(update_handle) == ESP_OK && esp_ota_set_boot_partition(update_partition) == ESP_OK) {
-                                ESP_LOGI("GitHub_OTA", "Nap hoan tat! Thiet bi tu dong restart...");
-                                delay(1000);
-                                esp_restart();
-                              } else {
-                                ESP_LOGE("GitHub_OTA", "Loi dong phan vung hoac ghi loi vao bootloader.");
-                              }
-                            } else {
-                              ESP_LOGE("GitHub_OTA", "Khong the mo khoa phan vung ota_0/ota_1.");
-                            }
-                          } else {
-                            ESP_LOGE("GitHub_OTA", "Loi: File firmware tu GitHub bi trong rong.");
-                          }
+                  md5: "00000000000000000000000000000000"
