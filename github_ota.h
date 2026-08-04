@@ -2,7 +2,10 @@
 #include "esphome.h"
 #include <WiFi.h>
 #include <HTTPClient.h>
-#include <Update.h>
+
+// Gọi trực tiếp cấu trúc nạp phần cứng gốc của chip, bỏ qua Update.h để tránh trùng lặp MD5
+#include "esp_ota_ops.h"
+#include "esp_partition.h"
 
 namespace esphome {
 
@@ -21,7 +24,7 @@ private:
         return latest_ver;
     }
 
-    // Luồng ngầm 1: Kiểm tra phiên bản từ GitHub API bằng Arduino HTTP
+    // Luồng ngầm 1: Kiểm tra phiên bản độc lập bằng Arduino HTTP
     static void check_version_task(void *pvParameters) {
         CheckParam *param = (CheckParam *)pvParameters;
         std::string url = "https://github.com" + param->user + "/" + param->repo + "/releases/latest";
@@ -64,39 +67,50 @@ private:
         vTaskDelete(NULL);
     }
 
-    // Luồng ngầm 2: Tải và nạp file .bin từ xa an toàn bằng Arduino Update Core
+    // Luồng ngầm 2: Ghi dữ liệu trực tiếp vào phân vùng OTA bằng hàm phần cứng gốc
     static void ota_task(void *pvParameters) {
         std::string *url = (std::string *)pvParameters;
         
         HTTPClient http;
         http.begin(url->c_str());
-        http.setTimeout(15000); // Tăng thời gian chờ tải file nặng
+        http.setTimeout(15000);
         
         int httpCode = http.GET();
         if (httpCode == HTTP_CODE_OK) {
             int contentLength = http.getSize();
-            bool canUpdate = Update.begin(contentLength);
+            WiFiClient *stream = http.getStreamPtr();
             
-            if (canUpdate) {
-                ESP_LOGI("GitHub_OTA", "Dang tai firmware va ghi vao Flash (%d bytes)...", contentLength);
-                WiFiClient *stream = http.getStreamPtr();
-                size_t written = Update.writeStream(*stream);
+            const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
+            if (update_partition != NULL) {
+                esp_ota_handle_t update_handle = 0;
+                esp_err_t err = esp_ota_begin(update_partition, contentLength, &update_handle);
                 
-                if (written == contentLength) {
-                    ESP_LOGI("GitHub_OTA", "Ghi file thanh cong %d bytes.", written);
-                }
-                
-                if (Update.end()) {
-                    if (Update.isFinished()) {
+                if (err == ESP_OK) {
+                    ESP_LOGI("GitHub_OTA", "Dang ghi file vao Flash (%d bytes)...", contentLength);
+                    uint8_t *ota_write_data = (uint8_t *)malloc(1024);
+                    int binary_size = 0;
+                    
+                    while (stream->connected() && binary_size < contentLength) {
+                        size_t available = stream->available();
+                        if (available > 0) {
+                            int read_len = stream->read(ota_write_data, available > 1024 ? 1024 : available);
+                            esp_ota_write(update_handle, (const void *)ota_write_data, read_len);
+                            binary_size += read_len;
+                        }
+                        delay(1);
+                    }
+                    free(ota_write_data);
+                    
+                    if (esp_ota_end(update_handle) == ESP_OK && esp_ota_set_as_boot_partition(update_partition) == ESP_OK) {
                         ESP_LOGI("GitHub_OTA", "Cap nhat hoan tat! Chip tu khoi dong lai...");
                         delay(1000);
-                        ESP.restart();
+                        esp_restart();
+                    } else {
+                        ESP_LOGE("GitHub_OTA", "Loi ket thuc ghi hoac set boot partition.");
                     }
                 } else {
-                    ESP_LOGE("GitHub_OTA", "Loi ket thuc Update (Ma loi: %d)", Update.getError());
+                    ESP_LOGE("GitHub_OTA", "Khong the khoi tao phan vung OTA.");
                 }
-            } else {
-                ESP_LOGE("GitHub_OTA", "Khong du bo nho trong de thuc hien ghi OTA.");
             }
         } else {
             ESP_LOGE("GitHub_OTA", "Loi HTTP khi tai firmware: %d", httpCode);
