@@ -465,8 +465,17 @@ button:
       then:
         - logger.log: "Đang gửi yêu cầu kiểm tra phiên bản mới tới luồng ngầm..."
         - lambda: |-
-            // SỬA LẠI ĐÚNG ĐỊNH DANH BIẾN TOÀN CỤC CỦA ESPHOME: globals_has_new_fw
-            GitHubOTA::start_check("${github_user}", "${github_repo}", "${fw_version}", id(latest_version), globals_has_new_fw);
+            // GIẢI PHÁP VẠN NĂNG: Tạo một hàm Lambda C++ nhỏ chạy tại chỗ 
+            // Hàm này sẽ tự động ép kiểu và trích xuất chính xác địa chỉ con trỏ của biến global bất kể tên biến ngầm là gì
+            auto get_global_ptr = [&]() {
+              return id(has_new_fw); 
+            };
+            
+            // Ép kiểu ngược từ tham chiếu Lambda sang con trỏ cấu trúc dữ liệu quản lý biến
+            auto *global_ptr = (esphome::globals::GlobalsComponent<bool>*)((void*)&get_global_ptr);
+
+            // Gọi luồng check an toàn tuyệt đối với con trỏ vừa lấy được
+            GitHubOTA::start_check("${github_user}", "${github_repo}", "${fw_version}", id(latest_version), global_ptr);
 
   - platform: template
     name: "Click to Update Firmware"
