@@ -1,5 +1,5 @@
 substitutions:
-  fw_version: "1.0.0" 
+  fw_version: "1.0.1" 
   github_user: "ngoccamhvn" 
   github_repo: "esp32_fan_smart" 
 
@@ -11,11 +11,13 @@ esphome:
     name: ngoccamhvn.esp32_fan_smart
     version: ${fw_version}
 
+# SỬA LẠI ĐOẠN NÀY Ở ĐẦU FILE (KHOẢNG DÒNG 21)
 esp32:
-  board: upesy_wroom
+  board: esp32dev # Đổi từ upesy_wroom sang esp32dev để sửa triệt để lỗi lệch ô nhớ boot
   variant: esp32
   framework:
     type: arduino
+
 
 api:
   encryption:
