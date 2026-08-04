@@ -1,21 +1,15 @@
-
 substitutions:
-  fw_version: "1.1.2" 
+  fw_version: "1.0.0" 
   github_user: "ngoccamhvn" 
-  github_repo: "esp32_fan_smart" # Kiểm tra chính xác tên Repo trên GitHub của anh
-
+  github_repo: "esp32_fan_smart" 
 
 esphome:
-  name: esp32-fan-smart
+  name: esp32-fan-smart 
   friendly_name: quatthongminh
   comment: "Firmware ${fw_version}"
   project:
     name: ngoccamhvn.esp32_fan_smart
     version: ${fw_version}
-  # CHÈN THÊM DÒNG NÀY VÀO ĐÂY
-  includes:
-    - native_ota.h
-
 
 esp32:
   board: upesy_wroom
@@ -29,9 +23,6 @@ api:
 
 ota:
   - platform: esphome
-
-
-
 
 web_server:
   port: 80
@@ -49,16 +40,42 @@ wifi:
 
 captive_portal:
 
-# VÔ HIỆU HÓA LOG SERIAL ĐỂ TRÁNH XUNG ĐỘT PHẦN CỨNG
 logger:
   baud_rate: 0
-    
-# SỬA LẠI ĐOẠN KHỐI HTTP_REQUEST (KHOẢNG DÒNG 62)
-http_request:
-  useragent: esphome-device
-  timeout: 10s
-  verify_ssl: false # CHÈN THÊM DÒNG NÀY ĐỂ BỎ QUA XÁC THỰC SSL TRÊN ARDUINO CORE
+  level: INFO
 
+# KÍCH HOẠT THÀNH PHẦN MẠNG GỐC CỦA ESPHOME (Tắt SSL để chạy mượt trên Arduino)
+http_request:
+  user_agent: esphome-device
+  timeout: 10s
+  verify_ssl: false
+
+# CÁC BIẾN TOÀN CỤC LƯU TRỮ TRẠNG THÁI
+globals:
+  - id: has_new_fw
+    type: bool
+    initial_value: 'false'
+  - id: learning_mode
+    type: int
+    initial_value: '0' 
+  - id: ir_num_power
+    type: uint32_t
+    initial_value: '0'
+  - id: ir_num_cycle
+    type: uint32_t
+    initial_value: '0'
+  - id: ir_num_speed1
+    type: uint32_t
+    initial_value: '0'
+  - id: ir_num_speed2
+    type: uint32_t
+    initial_value: '0'
+  - id: ir_num_speed3
+    type: uint32_t
+    initial_value: '0'
+  - id: ir_num_swing
+    type: uint32_t
+    initial_value: '0'
 
 text_sensor:
   - platform: template
@@ -463,10 +480,36 @@ button:
     icon: "mdi:cloud-check"
     on_press:
       then:
-        - logger.log: "Đang yêu cầu kiểm tra phiên bản từ luồng ngầm an toàn..."
-        - lambda: |-
-            // Gọi hàm check an toàn, truyền ID cảm biến và ID biến global trực tiếp
-            esphome::NativeOTA::start_check(id(latest_version), (esphome::globals::GlobalsComponent<bool>*)id(has_new_fw), "${fw_version}");
+        - logger.log: "Đang gọi kiểm tra phiên bản mới từ GitHub..."
+        - http_request.get:
+            url: "https://github.com"
+            headers:
+              User-Agent: "esphome-device"
+              Accept: "application/vnd.github.v3+json"
+            on_response:
+              then:
+                - lambda: |-
+                    // Sử dụng thuật toán bóc chuỗi Inline an toàn, cách ly hoàn toàn với Boot Vector
+                    size_t pos = body.find("\"tag_name\":\"");
+                    if (pos != std::string::npos) {
+                      pos += 12; 
+                      size_t end_pos = body.find("\"", pos);
+                      std::string new_ver = body.substr(pos, end_pos - pos);
+                      
+                      if (new_ver.rfind("v", 0) == 0) {
+                        new_ver = new_ver.substr(1);
+                      }
+                      
+                      id(latest_version).publish_state(new_ver);
+                      
+                      if (new_ver != "${fw_version}") {
+                        id(has_new_fw) = true;
+                        ESP_LOGI("GitHub_OTA", "Phat hien ban moi: %s. Mo khoa nut bam.", new_ver.c_str());
+                      } else {
+                        id(has_new_fw) = false;
+                        ESP_LOGI("GitHub_OTA", "Firmware hien tai da la moi nhat.");
+                      }
+                    }
 
   - platform: template
     name: "Click to Update Firmware"
@@ -476,8 +519,47 @@ button:
       then:
         - lambda: |-
             if (id(has_new_fw)) {
-              // Kích hoạt lệnh nạp tĩnh hoàn toàn cách ly chuỗi ký tự
-              esphome::NativeOTA::start_update();
+              ESP_LOGI("GitHub_OTA", "Kich hoat tien trinh tu dong nap firmware...");
             } else {
-              ESP_LOGW("GitHub_OTA", "Khong co ban cap nhat moi. Vui long nhan nut Check truoc!");
+              ESP_LOGW("GitHub_OTA", "Khong co ban cap nhat moi nào.");
             }
+        - if:
+            condition:
+              lambda: 'return id(has_new_fw);'
+            then:
+              # Giải pháp Native dứt điểm: Tải trực tiếp qua HTTP Request của ESPHome 2024
+              - http_request.get:
+                  url: "https://github.com"
+                  on_response:
+                    then:
+                      - lambda: |-
+                          // Đọc mảng byte thô trực tiếp từ luồng phản hồi mạng của hệ thống
+                          std::string bin_data = body;
+                          if (!bin_data.empty()) {
+                            size_t total_bytes = bin_data.size();
+                            ESP_LOGI("GitHub_OTA", "Tai thanh cong %d bytes. Bat dau ghi vao Flash...", total_bytes);
+                            
+                            // Gọi cấu trúc phân vùng cứng trực tiếp của thư viện hệ thống
+                            #include "esp_ota_ops.h"
+                            #include "esp_partition.h"
+                            
+                            const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
+                            esp_ota_handle_t update_handle = 0;
+                            
+                            if (update_partition != NULL && esp_ota_begin(update_partition, total_bytes, &update_handle) == ESP_OK) {
+                              esp_ota_write(update_handle, (const void *)bin_data.data(), total_bytes);
+                              
+                              if (esp_ota_end(update_handle) == ESP_OK && esp_ota_set_boot_partition(update_partition) == ESP_OK) {
+                                ESP_LOGI("GitHub_OTA", "Ghi hoan tat! Tu restart chip...");
+                                delay(1000);
+                                esp_restart();
+                              } else {
+                                ESP_LOGE("GitHub_OTA", "Loi set phan vung bootloader.");
+                              }
+                            } else {
+                              ESP_LOGE("GitHub_OTA", "Khong the khoi tao o ota_0/ota_1.");
+                            }
+                          } else {
+                            // Sửa lỗi cú pháp chuỗi rác
+                            ESP_LOGE("GitHub_OTA", "File tai ve bi trong.");
+                          }
