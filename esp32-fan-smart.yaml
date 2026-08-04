@@ -12,8 +12,9 @@ esphome:
   project:
     name: ngoccamhvn.esp32_fan_smart
     version: ${fw_version}
+  # CHÈN THÊM DÒNG NÀY VÀO ĐÂY
   includes:
-    - github_ota.h # <-- CHÈN THÊM DÒNG NÀY VÀO ĐÂY
+    - native_ota.h
 
 
 esp32:
@@ -470,7 +471,41 @@ button:
               else if (id(relay_toc_do_3).state) id(relay_toc_do_1).turn_on();
             }
           }
-# THAY THẾ CHÍNH XÁC KHỐI NÚT UPDATE_FIRMWARE_BTN (KHOẢNG DÒNG 520)
+# THAY THẾ CHÍNH XÁC TOÀN BỘ KHỐI BUTTON TỪ DÒNG CHECK UPDATE (KHOẢNG DÒNG 450)
+  - platform: template
+    name: "Check Firmware Update"
+    id: check_update_btn
+    icon: "mdi:cloud-check"
+    on_press:
+      then:
+        - http_request.get:
+            url: "https://github.com"
+            headers:
+              User-Agent: "esphome-device"
+              Accept: "application/vnd.github.v3+json"
+            on_response:
+              then:
+                - lambda: |-
+                    // Đọc mảng byte thô từ bộ đệm mạng độc lập với phiên bản ESPHome
+                    std::string body(response->content(), response->content_length());
+                    size_t pos = body.find("\"tag_name\":\"");
+                    if (pos != std::string::npos) {
+                      pos += 12; 
+                      size_t end_pos = body.find("\"", pos);
+                      std::string new_ver = body.substr(pos, end_pos - pos);
+                      if (new_ver.rfind("v", 0) == 0) new_ver = new_ver.substr(1);
+
+                      id(latest_version).publish_state(new_ver);
+
+                      if (new_ver != "${fw_version}") {
+                        id(has_new_fw) = true;
+                        ESP_LOGI("GitHub_OTA", "Phat hien ban moi: %s. San sang cap nhat.", new_ver.c_str());
+                      } else {
+                        id(has_new_fw) = false;
+                        ESP_LOGI("GitHub_OTA", "Firmware hien tai da la moi nhat.");
+                      }
+                    }
+
   - platform: template
     name: "Click to Update Firmware"
     id: update_firmware_btn
@@ -479,45 +514,8 @@ button:
       then:
         - lambda: |-
             if (id(has_new_fw)) {
-              ESP_LOGI("GitHub_OTA", "Đang tiến hành tải và nạp phần mềm mới từ GitHub...");
+              // Gọi hàm kích hoạt luồng nạp an toàn từ file native_ota.h độc lập
+              NativeOTA::start_update("https://github.com");
             } else {
-              ESP_LOGW("GitHub_OTA", "Không có bản cập nhật mới. Vui lòng nhấn nút Check trước!");
+              ESP_LOGW("GitHub_OTA", "Khong co ban cap nhat moi. Vui long nhan nut Check truoc!");
             }
-        - if:
-            condition:
-              lambda: 'return id(has_new_fw);'
-            then:
-              # Dùng http_request thông thường để kéo file nhị phân (Bỏ qua ép buộc check MD5)
-              - http_request.get:
-                  url: "https://github.com"
-                  on_response:
-                    then:
-                      - lambda: |-
-                          // Sử dụng biến response hệ thống gốc của ESPHome 2024 để bóc tách luồng dữ liệu thô
-                          std::string bin_body = response.get_string();
-                          
-                          if (!bin_body.empty()) {
-                            size_t total_bytes = bin_body.size();
-                            ESP_LOGI("GitHub_OTA", "Tải file thành công (%d bytes). Tiến hành mở khóa Flash...", total_bytes);
-                            
-                            // Gọi thư viện nạp phần cứng Arduino Core gốc có sẵn trong mạch
-                            #include <Update.h>
-                            
-                            if (Update.begin(total_bytes)) {
-                              size_t written = Update.write((uint8_t*)bin_body.data(), total_bytes);
-                              
-                              if (written == total_bytes && Update.end()) {
-                                if (Update.isFinished()) {
-                                  ESP_LOGI("GitHub_OTA", "Nạp thành công! Thiết bị tự động khởi động lại...");
-                                  delay(1000);
-                                  esp_restart(); // Lệnh khởi động lại phần cứng an toàn
-                                }
-                              } else {
-                                ESP_LOGE("GitHub_OTA", "Lỗi: Tiến trình ghi file vào Flash bị ngắt quãng giữa chừng.");
-                              }
-                            } else {
-                              ESP_LOGE("GitHub_OTA", "Lỗi: Không đủ bộ nhớ trống để thực hiện Flashing.");
-                            }
-                          } else {
-                            ESP_LOGE("GitHub_OTA", "Lỗi: File firmware tải về từ liên kết GitHub bị trống.");
-                          }
