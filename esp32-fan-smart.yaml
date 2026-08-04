@@ -46,7 +46,7 @@ logger:
 
 # KÍCH HOẠT THÀNH PHẦN MẠNG GỐC CỦA ESPHOME (Tắt SSL để chạy mượt trên Arduino)
 http_request:
-  user_agent: esphome-device
+  useragent: esphome-device
   timeout: 10s
   verify_ssl: false
 
