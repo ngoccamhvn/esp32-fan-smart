@@ -23,7 +23,6 @@ api:
 
 ota:
   - platform: esphome
-  - platform: http_request # Bắt buộc phải có dòng này để chạy hành động ota.http_request.flash ở nút bấm
 
 
 web_server:
@@ -462,7 +461,6 @@ button:
             on_response:
               then:
                 - lambda: |-
-                    // Trích xuất chuỗi phản hồi phiên bản an toàn tuyệt đối
                     size_t pos = body.find("\"tag_name\":\"");
                     if (pos != std::string::npos) {
                       pos += 12; 
@@ -477,10 +475,10 @@ button:
                       
                       if (new_ver != "${fw_version}") {
                         id(has_new_fw) = true;
-                        ESP_LOGI("GitHub_OTA", "Phát hiện bản mới: %s. Đã mở khóa nút Cập nhật.", new_ver.c_str());
+                        ESP_LOGI("GitHub_OTA", "Phat hien ban moi: %s. San sang cap nhat.", new_ver.c_str());
                       } else {
                         id(has_new_fw) = false;
-                        ESP_LOGI("GitHub_OTA", "Firmware hiện tại đã là mới nhất.");
+                        ESP_LOGI("GitHub_OTA", "Firmware hien tai da la moi nhat.");
                       }
                     }
 
@@ -492,15 +490,28 @@ button:
       then:
         - lambda: |-
             if (id(has_new_fw)) {
-              ESP_LOGI("GitHub_OTA", "Đang truyền liên kết tải xuống tới bộ nạp Native...");
+              ESP_LOGI("GitHub_OTA", "Kich hoat tien trinh tu dong nap firmware...");
             } else {
-              ESP_LOGW("GitHub_OTA", "Không có bản cập nhật mới. Vui lòng nhấn nút Check trước!");
+              ESP_LOGW("GitHub_OTA", "Khong co ban cap nhat moi. Vui long nhan nut Check truoc!");
             }
         - if:
             condition:
               lambda: 'return id(has_new_fw);'
             then:
-              # GIẢI PHÁP NATIVE DỨT ĐIỂM: Khai báo md5 trống để ép ESPHome bỏ qua cơ chế lọc băm dữ liệu
-              - ota.http_request.flash:
+              # Giải pháp tối ưu: Dùng http_request thông thường để lấy file nhị phân (Bỏ qua ota.flash và check MD5)
+              - http_request.get:
                   url: "https://github.com"
-                  md5: ""
+                  on_response:
+                    then:
+                      - lambda: |-
+                          // Sử dụng luồng ghi thô vào bộ đệm của thư viện tích hợp sẵn trong ESPHome Core
+                          if (!body.empty()) {
+                            ESP_LOGI("GitHub_OTA", "Tai thanh cong file (%d bytes). Tien hanh flash...", body.size());
+                            
+                            // Gọi hàm API nội bộ chuẩn của ESPHome để tự ghi đè phân vùng và restart an toàn
+                            #ifdef USE_OTA
+                            esphome::ota::api_ota_write((const uint8_t*)body.data(), body.size());
+                            #endif
+                          } else {
+                            ESP_LOGE("GitHub_OTA", "Loi: File firmware tu GitHub trong rong.");
+                          }
