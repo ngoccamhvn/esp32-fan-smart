@@ -1,6 +1,6 @@
 
 substitutions:
-  fw_version: "1.0.7" 
+  fw_version: "1.0.8" 
   github_user: "ngoccamhvn" 
   github_repo: "esp32_fan_smart" # Kiểm tra chính xác tên Repo trên GitHub của anh
 
@@ -18,11 +18,12 @@ esphome:
 
 # SỬA LẠI CHÍNH XÁC KHỐI ESP32 Ở ĐẦU FILE CỦA ANH
 esp32:
-  board: esp32dev
+  board: upesy_wroom # Trả về đúng tên bo mạch hãng uPesy của anh
   variant: esp32
   framework:
-    type: arduino # Đổi từ esp-idf sang arduino để phân vùng nhớ tự động co giãn hoàn hảo
-
+    type: arduino
+  # Ép hệ thống dùng bảng phân vùng cấu trúc 2 cổng OTA lớn song song, chống lệch ô nhớ bootloader
+  board_build.partitions: huge_app.csv 
 
 
 
