@@ -1,6 +1,6 @@
 
 substitutions:
-  fw_version: "1.0.9" 
+  fw_version: "1.1.0" 
   github_user: "ngoccamhvn" 
   github_repo: "esp32_fan_smart" # Kiểm tra chính xác tên Repo trên GitHub của anh
 
@@ -22,19 +22,13 @@ esp32:
   framework:
     type: arduino
 
-
-
-
-
-
 api:
   encryption:
     key: "9z61dUq7DVQB9fRsvqdPfAAokP6T1faELaNAXk6GVuw="
 
-
-# SỬA LẠI ĐOẠN KHỐI OTA (Xóa hoàn toàn các dòng platform cũ đi)
 ota:
   - platform: esphome
+  - platform: http_request
 
 
 
@@ -476,53 +470,52 @@ button:
               else if (id(relay_toc_do_3).state) id(relay_toc_do_1).turn_on();
             }
           }
-# THAY THẾ CHÍNH XÁC KHỐI NÚT TỪ DÒNG CHECK UPDATE (KHOẢNG DÒNG 450)
+# THAY THẾ CHÍNH XÁC TOÀN BỘ KHỐI BUTTON TỪ DÒNG CHECK UPDATE (KHOẢNG DÒNG 450)
   - platform: template
     name: "Check Firmware Update"
     id: check_update_btn
     icon: "mdi:cloud-check"
     on_press:
       then:
-        - logger.log: "Đang kiểm tra phiên bản mới từ luồng ngầm..."
-        - lambda: |-
-            // Khởi chạy luồng ngầm FreeRTOS trực tiếp bằng mã nguồn Inline, khóa cứng chuỗi tránh lệch ô nhớ boot
-            xTaskCreate([](void *pvParameters) {
-              // Sử dụng chuỗi chữ thuần túy, tuyệt đối không gọi biến substitution gây lỗi định vị ô nhớ
-              const char* url = "https://github.com";
-              
-              #include <HTTPClient.h>
-              HTTPClient http;
-              http.begin(url);
-              http.setUserAgent("esphome-device");
-              http.addHeader("Accept", "application/vnd.github.v3+json");
-              http.setTimeout(5000);
-              
-              int httpCode = http.GET();
-              if (httpCode == 200) {
-                std::string body = http.getString().c_str();
-                size_t pos = body.find("\"tag_name\":\"");
-                if (pos != std::string::npos) {
-                  pos += 12; 
-                  size_t end_pos = body.find("\"", pos);
-                  std::string new_ver = body.substr(pos, end_pos - pos);
-                  if (new_ver.rfind("v", 0) == 0) new_ver = new_ver.substr(1);
-                  
-                  id(latest_version).publish_state(new_ver);
-                  
-                  if (new_ver != "${fw_version}") {
-                    id(has_new_fw) = true;
-                    ESP_LOGI("GitHub_OTA", "Phat hien ban moi: %s. San sang cap nhat.", new_ver.c_str());
-                  } else {
-                    id(has_new_fw) = false;
-                    ESP_LOGI("GitHub_OTA", "Firmware hien tai da la moi nhat.");
-                  }
-                }
-              } else {
-                ESP_LOGE("GitHub_OTA", "Loi ket noi GitHub API, ma HTTP: %d", httpCode);
-              }
-              http.end();
-              vTaskDelete(NULL);
-            }, "check_task", 6144, NULL, 5, NULL);
+        - logger.log: "Đang gọi lệnh kiểm tra phiên bản mới từ ESPHome Native..."
+        # Gọi GitHub API thông qua thành phần http_request an toàn tuyệt đối của ESPHome
+        - http_request.get:
+            url: "https://github.com"
+            headers:
+              User-Agent: "esphome-device"
+              Accept: "application/vnd.github.v3+json"
+            on_response:
+              then:
+                - lambda: |-
+                    // Trích xuất chuỗi phản hồi mạng chuẩn xác
+                    std::string body = id(check_update_btn).get_string_response();
+                    
+                    // Tìm kiếm thẻ tag_name bằng thuật toán chuỗi thuần túy của ESPHome
+                    size_t pos = body.find("\"tag_name\":\"");
+                    if (pos != std::string::npos) {
+                      pos += 12; 
+                      size_t end_pos = body.find("\"", pos);
+                      std::string new_ver = body.substr(pos, end_pos - pos);
+                      
+                      // Cắt bỏ ký tự 'v' nếu có (Ví dụ: v1.0.1 -> 1.0.1)
+                      if (new_ver.rfind("v", 0) == 0) {
+                        new_ver = new_ver.substr(1);
+                      }
+                      
+                      // Cập nhật trạng thái hiển thị lên màn hình
+                      id(latest_version).publish_state(new_ver);
+                      
+                      // So sánh trực tiếp với biến fw_version hiện tại của thiết bị
+                      if (new_ver != "${fw_version}") {
+                        id(has_new_fw) = true;
+                        ESP_LOGI("GitHub_OTA", "Phat hien ban moi: %s. San sang cap nhat.", new_ver.c_str());
+                      } else {
+                        id(has_new_fw) = false;
+                        ESP_LOGI("GitHub_OTA", "Firmware hien tai da la moi nhat.");
+                      }
+                    } else {
+                      ESP_LOGE("GitHub_OTA", "Khong the tim thay thong tin phien ban tu GitHub API.");
+                    }
 
   - platform: template
     name: "Click to Update Firmware"
@@ -532,54 +525,15 @@ button:
       then:
         - lambda: |-
             if (id(has_new_fw)) {
-              ESP_LOGI("GitHub_OTA", "Dang khoi chay luong tai va nap firmware...");
-              
-              xTaskCreate([](void *pvParameters) {
-                #include <HTTPClient.h>
-                // Khóa cứng đường dẫn tải file trực tiếp dạng tĩnh
-                const char* ota_url = "https://github.com";
-                
-                HTTPClient http;
-                http.begin(ota_url);
-                http.setTimeout(15000);
-                
-                int httpCode = http.GET();
-                if (httpCode == 200) {
-                  int contentLength = http.getSize();
-                  WiFiClient *stream = http.getStreamPtr();
-                  
-                  #include "esp_ota_ops.h"
-                  const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
-                  esp_ota_handle_t update_handle = 0;
-                  
-                  if (update_partition != NULL && esp_ota_begin(update_partition, contentLength, &update_handle) == ESP_OK) {
-                    uint8_t *buffer = (uint8_t *)malloc(1024);
-                    int binary_size = 0;
-                    
-                    while (stream->connected() && binary_size < contentLength) {
-                      size_t available = stream->available();
-                      if (available > 0) {
-                        int read_len = stream->read(buffer, available > 1024 ? 1024 : available);
-                        esp_ota_write(update_handle, (const void *)buffer, read_len);
-                        binary_size += read_len;
-                      }
-                      delay(1);
-                    }
-                    free(buffer);
-                    
-                    if (esp_ota_end(update_handle) == ESP_OK && esp_ota_set_boot_partition(update_partition) == ESP_OK) {
-                      ESP_LOGI("GitHub_OTA", "Cap nhat hoan tat! Tu restart chip...");
-                      delay(1000);
-                      esp_restart();
-                    }
-                  }
-                } else {
-                  ESP_LOGE("GitHub_OTA", "Loi HTTP khi tai firmware: %d", httpCode);
-                }
-                http.end();
-                vTaskDelete(NULL);
-              }, "ota_task", 8192, NULL, 5, NULL);
-              
+              ESP_LOGI("GitHub_OTA", "Dang kich hoat luong tai va nap ota tu dong...");
             } else {
-              ESP_LOGW("GitHub_OTA", "Khong co ban cap nhat moi. Vui long nhan nut Check truoc!");
+              ESP_LOGW("GitHub_OTA", "Khong co ban cap nhat moi. Vui long kiem tra truoc!");
             }
+        - if:
+            condition:
+              lambda: 'return id(has_new_fw);'
+            then:
+              # Sử dụng lệnh nạp đè OTA Web Server gốc của ESPHome 2024.12.2
+              # Tự động tải file nhị phân vào bộ đệm mạng và ép reboot an toàn
+              - ota.http_request.flash:
+                  url: "https://github.com"
