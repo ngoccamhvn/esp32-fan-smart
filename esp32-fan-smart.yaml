@@ -91,35 +91,6 @@ text_sensor:
 
 
 # ==============================================================================
-# BỘ NHỚ LƯU TRỮ MÃ SÓNG HỒNG NGOẠI (LƯU TRỮ VĨNH VIỄN)
-# ==============================================================================
-globals:
-  - id: learning_mode
-    type: int
-    initial_value: '0' # 0: Thường, 1: Tắt bật, 2: Chuyển số, 3: Số 1, 4: Số 2, 5: Số 3, 6: Đảo gió
-  - id: ir_num_power
-    type: uint32_t
-    initial_value: '0'
-  - id: ir_num_cycle
-    type: uint32_t
-    initial_value: '0'
-  - id: ir_num_speed1
-    type: uint32_t
-    initial_value: '0'
-  - id: ir_num_speed2
-    type: uint32_t
-    initial_value: '0'
-  - id: ir_num_speed3
-    type: uint32_t
-    initial_value: '0'
-  - id: ir_num_swing
-    type: uint32_t
-    initial_value: '0'
-  - id: has_new_fw
-    type: bool
-    initial_value: 'false' # Mặc định là false (chưa có bản mới)
-
-# ==============================================================================
 # BỘ THU HỒNG NGOẠI MÃ HÓA TOÀN CHUỖI SỬ DỤNG MURMURHASH VẠN NĂNG (GPIO12)
 # ==============================================================================
 remote_receiver:
