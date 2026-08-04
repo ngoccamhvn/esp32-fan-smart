@@ -17,6 +17,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 1. TỰ ĐỘNG CẮT CHUỖI LẤY SỐ PHIÊN BẢN CHUẨN XÁC, KHÔNG BỊ DÍNH KÝ TỰ LẠ
+      - name: Get firmware version
+        id: get_ver
+        run: |
+          VERSION=$(grep 'fw_version:' esp32-fan-smart.yaml | head -n1 | sed 's/fw_version://g' | tr -d '"' | tr -d "'" | tr -d ' ')
+          echo "FW_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Dự án đang cấu hình phiên bản: $VERSION"
+
       - name: Set up and Compile ESPHome
         id: esphome-build
         uses: esphome/build-action@v7
@@ -24,25 +32,37 @@ jobs:
           yaml-file: esp32-fan-smart.yaml
           version: 2024.12.2
 
-      - name: Prepare firmware file
+      # 2. THUẬT TOÁN QUÉT VÀ THU GOM ĐẦY ĐỦ CẢ 2 ĐỊNH DẠNG FILE BIN ĐẦU RA
+      - name: Prepare firmware files
         run: |
           mkdir -p output_fw
-          # Tự động quét và tìm file factory tổng hợp (chứa sẵn bootloader phần cứng)
+          
+          # Tìm và lôi file firmware.bin ứng dụng thuần túy ra ngoài (Dành cho nạp OTA qua mạng WiFi)
+          find .esphome/build/ -name "firmware.bin" -exec cp {} ./firmware.bin \;
+          
+          # Tìm và lôi file firmware-factory.bin tổng hợp ra ngoài (Dành cho cứu hộ nạp cáp địa chỉ 0x0)
           find .esphome/build/ -name "*factory.bin" -exec cp {} ./firmware-factory.bin \;
           
-          if [ ! -f ./firmware-factory.bin ]; then
-            echo "LỖI: Không tìm thấy file factory tổng hợp!"
+          # Kiểm tra an toàn hệ thống
+          if [ ! -f ./firmware.bin ] && [ ! -f ./firmware-factory.bin ]; then
+            echo "LỖI: Không tìm thấy bất kỳ file firmware nào được sinh ra!"
             exit 1
           fi
+          echo "Thành công: Đã tìm thấy và chuẩn hóa bộ đôi file cài đặt."
 
+      # 3. ĐẨY ĐỒNG THỜI CẢ 2 FILE VÀO MỤC RELEASE THEO ĐÚNG SỐ PHIÊN BẢN CỦA YAML
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }}
-          name: Release v${{ github.run_number }}
+          tag_name: v${{ env.FW_VERSION }}
+          name: Release v${{ env.FW_VERSION }}
           body: |
-            Tự động biên dịch Firmware tổng hợp cho esp32-fan-smart thành công.
+            Tự động biên dịch Firmware hệ thống thành công.
+            - Phiên bản ứng dụng: v${{ env.FW_VERSION }}
+            - File `firmware.bin`: Dùng để nâng cấp từ xa qua giao diện mạng IP (OTA) [17:29].
+            - File `firmware-factory.bin`: Dùng để cắm dây cáp cứu hộ phần cứng máy tính địa chỉ 0x0 [16:52].
           files: |
+            firmware.bin
             firmware-factory.bin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
