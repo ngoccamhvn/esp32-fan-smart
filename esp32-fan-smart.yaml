@@ -65,20 +65,6 @@ text_sensor:
     name: "Latest Version Available"
     id: latest_version
     icon: "mdi:github"
-    # Cứ mỗi 2 giây, cảm biến tự động kiểm tra xem luồng ngầm đã lấy được version mới từ github về chưa
-    update_interval: 2s
-    lambda: |-
-      std::string new_ver = esphome::GitHubOTA::get_new_version();
-      if (!new_ver.empty()) {
-        // Nếu có bản mới khác bản hiện tại, tự động bật cờ cho phép update
-        if (new_ver != "${fw_version}") {
-          id(has_new_fw) = true;
-        } else {
-          id(has_new_fw) = false;
-        }
-        return {new_ver};
-      }
-      return {"Chưa kiểm tra"};
 
   - platform: template
     name: "Trạng thái học lệnh IR"
@@ -471,7 +457,6 @@ button:
               else if (id(relay_toc_do_3).state) id(relay_toc_do_1).turn_on();
             }
           }
-# THAY THẾ CHÍNH XÁC TOÀN BỘ KHỐI BUTTON TỪ DÒNG CHECK UPDATE (KHOẢNG DÒNG 450)
   - platform: template
     name: "Check Firmware Update"
     id: check_update_btn
@@ -486,17 +471,19 @@ button:
             on_response:
               then:
                 - lambda: |-
-                    // Đọc mảng byte thô từ bộ đệm mạng độc lập với phiên bản ESPHome
-                    std::string body(response->content(), response->content_length());
+                    // ESPHome 2024 tự đẻ sẵn biến 'body'. Ta dùng thuật toán tìm chuỗi trực tiếp trên nó:
                     size_t pos = body.find("\"tag_name\":\"");
                     if (pos != std::string::npos) {
                       pos += 12; 
                       size_t end_pos = body.find("\"", pos);
                       std::string new_ver = body.substr(pos, end_pos - pos);
-                      if (new_ver.rfind("v", 0) == 0) new_ver = new_ver.substr(1);
-
+                      
+                      if (new_ver.rfind("v", 0) == 0) {
+                        new_ver = new_ver.substr(1);
+                      }
+                      
                       id(latest_version).publish_state(new_ver);
-
+                      
                       if (new_ver != "${fw_version}") {
                         id(has_new_fw) = true;
                         ESP_LOGI("GitHub_OTA", "Phat hien ban moi: %s. San sang cap nhat.", new_ver.c_str());
@@ -504,6 +491,8 @@ button:
                         id(has_new_fw) = false;
                         ESP_LOGI("GitHub_OTA", "Firmware hien tai da la moi nhat.");
                       }
+                    } else {
+                      ESP_LOGE("GitHub_OTA", "Khong tim thay thong tin tag_name tu GitHub API.");
                     }
 
   - platform: template
@@ -514,8 +503,8 @@ button:
       then:
         - lambda: |-
             if (id(has_new_fw)) {
-              // Gọi hàm kích hoạt luồng nạp an toàn từ file native_ota.h độc lập
-              NativeOTA::start_update("https://github.com");
+              // Gọi hàm nạp ngầm FreeRTOS chính xác từ file native_ota.h
+              esphome::NativeOTA::start_update("https://github.com");
             } else {
               ESP_LOGW("GitHub_OTA", "Khong co ban cap nhat moi. Vui long nhan nut Check truoc!");
             }
