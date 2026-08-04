@@ -25,12 +25,14 @@ jobs:
           echo "FW_VERSION=$VERSION" >> $GITHUB_ENV
           echo "Dự án đang ở phiên bản: $VERSION"
 
+# SỬA LẠI ĐOẠN NÀY TRONG FILE deploy.yml
       - name: Set up and Compile ESPHome
         id: esphome-build
         uses: esphome/build-action@v7
         with:
           yaml-file: esp32-fan-smart.yaml
-          version: latest
+          version: 2024.12.2 # Đổi từ latest thành bản ổn định này
+
 
       - name: Prepare firmware file
         run: |
