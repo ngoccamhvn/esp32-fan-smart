@@ -28,7 +28,7 @@ api:
 
 ota:
   - platform: esphome
-  - platform: http_request
+
 
 
 
@@ -470,53 +470,7 @@ button:
               else if (id(relay_toc_do_3).state) id(relay_toc_do_1).turn_on();
             }
           }
-# THAY THẾ CHÍNH XÁC TOÀN BỘ KHỐI BUTTON TỪ DÒNG CHECK UPDATE (KHOẢNG DÒNG 450)
-  - platform: template
-    name: "Check Firmware Update"
-    id: check_update_btn
-    icon: "mdi:cloud-check"
-    on_press:
-      then:
-        - logger.log: "Đang gọi lệnh kiểm tra phiên bản mới từ ESPHome Native..."
-        # Gọi GitHub API thông qua thành phần http_request an toàn tuyệt đối của ESPHome
-        - http_request.get:
-            url: "https://github.com"
-            headers:
-              User-Agent: "esphome-device"
-              Accept: "application/vnd.github.v3+json"
-            on_response:
-              then:
-                - lambda: |-
-                    // Trích xuất chuỗi phản hồi mạng chuẩn xác
-                    std::string body = id(check_update_btn).get_string_response();
-                    
-                    // Tìm kiếm thẻ tag_name bằng thuật toán chuỗi thuần túy của ESPHome
-                    size_t pos = body.find("\"tag_name\":\"");
-                    if (pos != std::string::npos) {
-                      pos += 12; 
-                      size_t end_pos = body.find("\"", pos);
-                      std::string new_ver = body.substr(pos, end_pos - pos);
-                      
-                      // Cắt bỏ ký tự 'v' nếu có (Ví dụ: v1.0.1 -> 1.0.1)
-                      if (new_ver.rfind("v", 0) == 0) {
-                        new_ver = new_ver.substr(1);
-                      }
-                      
-                      // Cập nhật trạng thái hiển thị lên màn hình
-                      id(latest_version).publish_state(new_ver);
-                      
-                      // So sánh trực tiếp với biến fw_version hiện tại của thiết bị
-                      if (new_ver != "${fw_version}") {
-                        id(has_new_fw) = true;
-                        ESP_LOGI("GitHub_OTA", "Phat hien ban moi: %s. San sang cap nhat.", new_ver.c_str());
-                      } else {
-                        id(has_new_fw) = false;
-                        ESP_LOGI("GitHub_OTA", "Firmware hien tai da la moi nhat.");
-                      }
-                    } else {
-                      ESP_LOGE("GitHub_OTA", "Khong the tim thay thong tin phien ban tu GitHub API.");
-                    }
-
+# THAY THẾ CHÍNH XÁC KHỐI NÚT UPDATE_FIRMWARE_BTN (KHOẢNG DÒNG 520)
   - platform: template
     name: "Click to Update Firmware"
     id: update_firmware_btn
@@ -525,15 +479,45 @@ button:
       then:
         - lambda: |-
             if (id(has_new_fw)) {
-              ESP_LOGI("GitHub_OTA", "Dang kich hoat luong tai va nap ota tu dong...");
+              ESP_LOGI("GitHub_OTA", "Đang tiến hành tải và nạp phần mềm mới từ GitHub...");
             } else {
-              ESP_LOGW("GitHub_OTA", "Khong co ban cap nhat moi. Vui long kiem tra truoc!");
+              ESP_LOGW("GitHub_OTA", "Không có bản cập nhật mới. Vui lòng nhấn nút Check trước!");
             }
         - if:
             condition:
               lambda: 'return id(has_new_fw);'
             then:
-              # Sử dụng lệnh nạp đè OTA Web Server gốc của ESPHome 2024.12.2
-              # Tự động tải file nhị phân vào bộ đệm mạng và ép reboot an toàn
-              - ota.http_request.flash:
+              # Dùng http_request thông thường để kéo file nhị phân (Bỏ qua ép buộc check MD5)
+              - http_request.get:
                   url: "https://github.com"
+                  on_response:
+                    then:
+                      - lambda: |-
+                          // Sử dụng biến response hệ thống gốc của ESPHome 2024 để bóc tách luồng dữ liệu thô
+                          std::string bin_body = response.get_string();
+                          
+                          if (!bin_body.empty()) {
+                            size_t total_bytes = bin_body.size();
+                            ESP_LOGI("GitHub_OTA", "Tải file thành công (%d bytes). Tiến hành mở khóa Flash...", total_bytes);
+                            
+                            // Gọi thư viện nạp phần cứng Arduino Core gốc có sẵn trong mạch
+                            #include <Update.h>
+                            
+                            if (Update.begin(total_bytes)) {
+                              size_t written = Update.write((uint8_t*)bin_body.data(), total_bytes);
+                              
+                              if (written == total_bytes && Update.end()) {
+                                if (Update.isFinished()) {
+                                  ESP_LOGI("GitHub_OTA", "Nạp thành công! Thiết bị tự động khởi động lại...");
+                                  delay(1000);
+                                  esp_restart(); // Lệnh khởi động lại phần cứng an toàn
+                                }
+                              } else {
+                                ESP_LOGE("GitHub_OTA", "Lỗi: Tiến trình ghi file vào Flash bị ngắt quãng giữa chừng.");
+                              }
+                            } else {
+                              ESP_LOGE("GitHub_OTA", "Lỗi: Không đủ bộ nhớ trống để thực hiện Flashing.");
+                            }
+                          } else {
+                            ESP_LOGE("GitHub_OTA", "Lỗi: File firmware tải về từ liên kết GitHub bị trống.");
+                          }
