@@ -30,10 +30,11 @@ api:
   encryption:
     key: "9z61dUq7DVQB9fRsvqdPfAAokP6T1faELaNAXk6GVuw="
 
+
+# SỬA LẠI ĐOẠN KHỐI OTA (Xóa hoàn toàn các dòng platform cũ đi)
 ota:
   - platform: esphome
-  - platform: web_server
-  - platform: http_request # THÊM DÒNG NÀY VÀO ĐÂY ĐỂ KÍCH HOẠT TÍNH NĂNG NẠP QUA URL!
+
 
 
 web_server:
