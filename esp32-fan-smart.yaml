@@ -17,7 +17,10 @@ esphome:
 
 
 esp32:
+  board: upesy_wroom # Hoặc esp32dev tùy bo mạch của anh
   variant: esp32
+  framework:
+    type: esp-idf # Đảm bảo đang chạy framework gốc để nhận file .h
 
 api:
   encryption:
