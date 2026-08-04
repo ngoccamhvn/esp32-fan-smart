@@ -465,8 +465,8 @@ button:
       then:
         - logger.log: "Đang gửi yêu cầu kiểm tra phiên bản mới tới luồng ngầm..."
         - lambda: |-
-            // Truyền trực tiếp ID cảm biến và ID biến global vào hàm xử lý của file .h
-            GitHubOTA::start_check("${github_user}", "${github_repo}", "${fw_version}", id(latest_version), id(has_new_fw));
+            // Sửa lỗi: Thêm hậu tố _global để truyền chính xác con trỏ cấu trúc quản lý biến toàn cục vào file .h
+            GitHubOTA::start_check("${github_user}", "${github_repo}", "${fw_version}", id(latest_version), has_new_fw_global);
 
   - platform: template
     name: "Click to Update Firmware"
